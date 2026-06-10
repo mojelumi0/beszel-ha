@@ -445,8 +445,9 @@ class BeszelTemperatureSensor(BeszelBaseSensor):
         temperatures = self.stats_data.get("t")
 
         attributes = {}
-        for key, value in temperatures.items():
-            attributes[f"temperature_{key}"] = value
+        if temperatures:
+            for key, value in temperatures.items():
+                attributes[f"temperature_{key}"] = value
 
         return attributes
 
