@@ -153,6 +153,16 @@ async def async_setup_entry(hass, entry):
 
 async def async_unload_entry(hass, entry):
     """Unload a config entry."""
+    # Close coordinator to stop updates and cleanup connections
+    data = hass.data[DOMAIN].get(entry.entry_id)
+    if data:
+        coordinator = data.get("coordinator")
+        if coordinator:
+            coordinator.async_shutdown()
+        hub_coordinator = data.get("hub")
+        if hub_coordinator:
+            hub_coordinator.async_shutdown()
+    
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unload_ok:
         hass.data[DOMAIN].pop(entry.entry_id)
