@@ -55,9 +55,14 @@ class BeszelApiClient:
                         self._username,
                         self._password,
                     )
+                except (httpx.ConnectError, httpx.TimeoutException, httpx.HTTPError) as err:
+                    raise BeszelCannotConnect("Connection lost during authentication") from err
                 except Exception as err:
-                    raise BeszelInvalidAuth("Invalid username or password") from err
-
+                    # Assume authentication error if message contains auth-related keywords
+                    if "auth" in str(err).lower() or "password" in str(err).lower():
+                        raise BeszelInvalidAuth("Invalid username or password") from err
+                    raise BeszelApiError(f"Unexpected error during authentication: {err}") from err
+                    
     def get_systems(self) -> list[RecordModel]:
         try:
             self._ensure_client()
