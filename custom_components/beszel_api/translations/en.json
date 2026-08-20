@@ -1,5 +1,12 @@
 {
   "config": {
+    "error": {
+      "cannot_connect": "Failed to connect to the Beszel instance.",
+      "invalid_auth": "Invalid username or password.",
+      "invalid_url": "URL must start with http:// or https://.",
+      "invalid_update_interval": "Update interval must be between 10 and 3600 seconds.",
+      "unknown": "Unexpected error occurred."
+    },
     "step": {
       "user": {
         "title": "Add Beszel API configuration",
@@ -15,6 +22,13 @@
     }
   },
   "options": {
+    "error": {
+      "cannot_connect": "Failed to connect to the Beszel instance.",
+      "invalid_auth": "Invalid username or password.",
+      "invalid_url": "URL must start with http:// or https://.",
+      "invalid_update_interval": "Update interval must be between 10 and 3600 seconds.",
+      "unknown": "Unexpected error occurred."
+    },
     "step": {
       "init": {
           "title": "Update Beszel API configuration",

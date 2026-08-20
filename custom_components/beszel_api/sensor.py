@@ -68,14 +68,24 @@ class BeszelBaseSensor(CoordinatorEntity, SensorEntity):
     def __init__(self, coordinator, system):
         super().__init__(coordinator)
         self._system_id = system.id
+        self._system_cache = system
 
     @property
     def system(self):
-        systems = self.coordinator.data['systems']
+        if self._system_cache is not None:
+            return self._system_cache
+
+        systems = self.coordinator.data.get('systems', [])
         for s in systems:
             if s.id == self._system_id:
+                self._system_cache = s
                 return s
         return None
+
+    def _handle_coordinator_update(self) -> None:
+        """Handle updated data from the coordinator."""
+        self._system_cache = None
+        super()._handle_coordinator_update()
 
     @property
     def stats_data(self):

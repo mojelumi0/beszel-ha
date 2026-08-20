@@ -1,5 +1,12 @@
 {
   "config": {
+    "error": {
+      "cannot_connect": "Verbindung zur Beszel-Instanz fehlgeschlagen.",
+      "invalid_auth": "Ungültiger Benutzername oder Passwort.",
+      "invalid_url": "Die URL muss mit http:// oder https:// beginnen.",
+      "invalid_update_interval": "Das Updateintervall muss zwischen 10 und 3600 Sekunden liegen.",
+      "unknown": "Unerwarteter Fehler aufgetreten."
+    },
     "step": {
       "user": {
         "title": "Beszel API konfigurieren",
@@ -15,6 +22,13 @@
     }
   },
   "options": {
+    "error": {
+      "cannot_connect": "Verbindung zur Beszel-Instanz fehlgeschlagen.",
+      "invalid_auth": "Ungültiger Benutzername oder Passwort.",
+      "invalid_url": "Die URL muss mit http:// oder https:// beginnen.",
+      "invalid_update_interval": "Das Updateintervall muss zwischen 10 und 3600 Sekunden liegen.",
+      "unknown": "Unerwarteter Fehler aufgetreten."
+    },
     "step": {
       "init": {
         "title": "Beszel API ändern",
