@@ -68,7 +68,7 @@ class BeszelBaseSensor(CoordinatorEntity, SensorEntity):
     def __init__(self, coordinator, system):
         super().__init__(coordinator)
         self._system_id = system.id
-        self._system_cache = system
+        self._system_cache = None
 
     @property
     def system(self):
