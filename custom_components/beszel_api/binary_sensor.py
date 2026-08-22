@@ -3,7 +3,7 @@ from homeassistant.components.binary_sensor import (
     BinarySensorDeviceClass,
 )
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
-from .const import DOMAIN, LOGGER
+from .const import DOMAIN, LOGGER, SMART_CURATED_ATTRIBUTES
 
 async def async_setup_entry(hass, entry, async_add_entities):
     data = hass.data[DOMAIN][entry.entry_id]
@@ -205,5 +205,26 @@ class BeszelSmartBinarySensor(BeszelBaseBinarySensor):
         # Health state
         state = device_data.get('state', '')
         attributes['health_state'] = state
+
+        # Curated raw S.M.A.R.T. attributes (reallocated sectors, wear level,
+        # CRC errors, etc.) plus a list of attribute names Beszel has flagged
+        # as failing, so this stays useful without needing new entities.
+        failed_attributes = []
+        for raw_attr in device_data.get('attributes') or []:
+            name = raw_attr.get('n')
+            if not name:
+                continue
+            if raw_attr.get('wf'):
+                failed_attributes.append(name)
+            ha_key = SMART_CURATED_ATTRIBUTES.get(name)
+            if ha_key is None:
+                continue
+            # Prefer the human-readable raw string (e.g. "7344 (253d 8h)"),
+            # fall back to the raw numeric value.
+            value = raw_attr.get('rs') or raw_attr.get('rv')
+            if value not in (None, ''):
+                attributes[ha_key] = value
+        if failed_attributes:
+            attributes['smart_failed_attributes'] = failed_attributes
 
         return attributes
