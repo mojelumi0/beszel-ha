@@ -588,9 +588,10 @@ class BeszelBatterySensor(BeszelBaseSensor):
 
     @property
     def native_value(self):
-        if not self.stats_data:
+        bat = self.stats_data.get("bat") if self.stats_data else None
+        if not bat:
             return None
-        return self.stats_data.get("bat")[0]
+        return bat[0]
 
     @property
     def native_unit_of_measurement(self):
