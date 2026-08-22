@@ -13,8 +13,8 @@
         "description": "Enter your Beszel API connection details",
         "data": {
           "url": "URL",
-          "username": "Username (optional)",
-          "password": "Password (optional)",
+          "username": "Username",
+          "password": "Password",
           "update_interval": "API update interval in seconds",
           "verify_ssl": "Verify Beszel API SSL certificate"
         }
@@ -35,8 +35,8 @@
           "description": "Change your Beszel API connection details",
           "data": {
             "url": "URL",
-            "username": "Username (optional)",
-            "password": "Password (optional)",
+            "username": "Username",
+            "password": "Password",
           "update_interval": "API update interval in seconds",
             "verify_ssl": "Verify Beszel API SSL certificate"
           }
