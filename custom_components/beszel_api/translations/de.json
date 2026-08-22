@@ -35,8 +35,8 @@
         "description": "Ändere deine Beszel API Verbindungsdaten",
         "data": {
           "url": "URL",
-          "username": "Benutzername (optional)",
-          "password": "Passwort (optional)",
+          "username": "Benutzername",
+          "password": "Passwort",
           "update_interval": "API Updateintervall in Sekunden",
           "verify_ssl": "Beszel API SSL Zertifikat überprüfen"
         }
