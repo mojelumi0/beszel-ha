@@ -131,20 +131,16 @@ class BeszelConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     @staticmethod
     @callback
     def async_get_options_flow(config_entry: config_entries.ConfigEntry):
-        return BeszelOptionsFlow(config_entry)
+        return BeszelOptionsFlow()
 
 
 class BeszelOptionsFlow(config_entries.OptionsFlow):
-    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
-        super().__init__()
-        self._config_entry = config_entry
-
     async def async_step_init(self, user_input: Optional[dict[str, Any]] = None):
         errors: dict[str, str] = {}
 
         if user_input is not None:
             try:
-                merged_data = {**self._config_entry.data, **user_input}
+                merged_data = {**self.config_entry.data, **user_input}
                 validated_data = await _async_validate_input(self.hass, merged_data)
             except InvalidUrl:
                 errors["base"] = "invalid_url"
@@ -158,14 +154,14 @@ class BeszelOptionsFlow(config_entries.OptionsFlow):
                 errors["base"] = "unknown"
             else:
                 self.hass.config_entries.async_update_entry(
-                    self._config_entry,
-                    data={**self._config_entry.data, **validated_data},
+                    self.config_entry,
+                    data={**self.config_entry.data, **validated_data},
                 )
-                await self.hass.config_entries.async_reload(self._config_entry.entry_id)
+                await self.hass.config_entries.async_reload(self.config_entry.entry_id)
                 return self.async_create_entry(title="", data={})
 
         return self.async_show_form(
             step_id="init",
-            data_schema=_build_schema({**self._config_entry.data, **(user_input or {})}),
+            data_schema=_build_schema({**self.config_entry.data, **(user_input or {})}),
             errors=errors,
         )
