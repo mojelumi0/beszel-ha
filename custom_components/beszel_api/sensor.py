@@ -481,7 +481,10 @@ class BeszelUptimeSensor(BeszelBaseSensor):
 
     @property
     def native_value(self):
-        return self.system.info.get("u") / 60 if self.system else None
+        if not self.system:
+            return None
+        uptime_seconds = self.system.info.get("u")
+        return uptime_seconds / 60 if uptime_seconds is not None else None
 
     @property
     def suggested_display_precision(self):
