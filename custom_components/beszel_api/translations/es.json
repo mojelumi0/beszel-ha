@@ -1,13 +1,20 @@
 {
   "config": {
+    "error": {
+      "cannot_connect": "No se pudo conectar a la instancia de Beszel.",
+      "invalid_auth": "Nombre de usuario o contraseña no válidos.",
+      "invalid_url": "La URL debe comenzar con http:// o https://.",
+      "invalid_update_interval": "El intervalo de actualización debe estar entre 10 y 3600 segundos.",
+      "unknown": "Se produjo un error inesperado."
+    },
     "step": {
       "user": {
         "title": "Añadir configuración de la API de Beszel",
         "description": "Introduce los datos de conexión de la API de Beszel",
         "data": {
           "url": "URL",
-          "username": "Usuario (opcional)",
-          "password": "Contraseña (opcional)",
+          "username": "Usuario",
+          "password": "Contraseña",
           "update_interval": "Intervalo de actualización de la API en segundos",
           "verify_ssl": "Verificar el certificado SSL de la API de Beszel"
         }
@@ -15,14 +22,21 @@
     }
   },
   "options": {
+    "error": {
+      "cannot_connect": "No se pudo conectar a la instancia de Beszel.",
+      "invalid_auth": "Nombre de usuario o contraseña no válidos.",
+      "invalid_url": "La URL debe comenzar con http:// o https://.",
+      "invalid_update_interval": "El intervalo de actualización debe estar entre 10 y 3600 segundos.",
+      "unknown": "Se produjo un error inesperado."
+    },
     "step": {
       "init": {
         "title": "Actualizar configuración de la API de Beszel",
         "description": "Cambia los datos de conexión de la API de Beszel",
         "data": {
           "url": "URL",
-          "username": "Usuario (opcional)",
-          "password": "Contraseña (opcional)",
+          "username": "Usuario",
+          "password": "Contraseña",
           "update_interval": "Intervalo de actualización de la API en segundos",
           "verify_ssl": "Verificar el certificado SSL de la API de Beszel"
         }

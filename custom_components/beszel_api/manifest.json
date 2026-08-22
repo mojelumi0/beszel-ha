@@ -1,13 +1,13 @@
 {
   "domain": "beszel_api",
   "name": "Beszel API",
-  "codeowners": ["@ronjar"],
+  "codeowners": ["@mojelumi0"],
   "config_flow": true,
   "dependencies": [],
-  "documentation": "https://github.com/ronjar/beszel-ha",
+  "documentation": "https://github.com/mojelumi0/beszel-ha",
   "iot_class": "local_polling",
-  "issue_tracker": "https://github.com/Ronjar/beszel-ha/issues",
+  "issue_tracker": "https://github.com/mojelumi0/beszel-ha/issues",
   "requirements": ["pocketbase>=0.17.0"],
-  "version": "1.0.1"
+  "version": "1.0.3"
 }
 

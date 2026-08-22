@@ -56,7 +56,7 @@ class BeszelBaseBinarySensor(CoordinatorEntity, BinarySensorEntity):
         sys = self.system
         if sys is None:
             return None
-        info = getattr(sys, "info", {})
+        info = getattr(sys, "info", None) or {}
         return {
             "identifiers": {(DOMAIN, sys.id)},
             "name": sys.name,

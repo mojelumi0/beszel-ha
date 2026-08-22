@@ -16,30 +16,48 @@ async def async_setup_entry(hass, entry):
     verify_ssl = entry.data.get(CONF_VERIFY_SSL, True)
     update_interval = entry.data.get(CONF_UPDATE_INTERVAL, 120)
     client = BeszelApiClient(url, username, password, verify_ssl)
+    LOGGER.debug(
+        "Setting up Beszel entry %s (url=%s, verify_ssl=%s, update_interval=%ss)",
+        entry.entry_id,
+        url,
+        verify_ssl,
+        update_interval,
+    )
 
     async def async_update_data():
         try:
             systems = await hass.async_add_executor_job(client.get_systems)
+            system_names = [getattr(system, "name", system.id) for system in systems]
+            LOGGER.debug(
+                "Fetched %d systems from Beszel: %s",
+                len(systems),
+                ", ".join(system_names) if system_names else "none",
+            )
 
             if not systems:
                 LOGGER.warning("No systems found in Beszel API")
                 return {"systems": [], "stats": {}}
 
-            # Create a stats dictionary to store stats by system ID
-            stats_data = {}
-
-            # Fetch system stats for each system
-            for system in systems:
+            # Fetch stats for all systems concurrently instead of one by one
+            async def _fetch_stats(system):
+                system_name = getattr(system, "name", system.id)
                 try:
+                    LOGGER.debug("Fetching stats for system %s (%s)", system_name, system.id)
                     stats = await hass.async_add_executor_job(client.get_system_stats, system.id)
-                    if stats:
-                        # Store stats in the stats dictionary
-                        stats_data[system.id] = stats.stats if hasattr(stats, 'stats') else {}
-                    else:
-                        stats_data[system.id] = {}
+                    data = stats.stats if stats and hasattr(stats, "stats") else {}
+                    LOGGER.debug(
+                        "Received stats for system %s (%s) with keys: %s",
+                        system_name,
+                        system.id,
+                        ", ".join(data.keys()) if data else "none",
+                    )
+                    return system.id, data
                 except Exception as e:
-                    LOGGER.warning(f"Failed to fetch stats for system {system.id}: {e}")
-                    stats_data[system.id] = {}
+                    LOGGER.warning("Failed to fetch stats for system %s: %s", system.id, e, exc_info=True)
+                    return system.id, {}
+
+            results = await asyncio.gather(*(_fetch_stats(system) for system in systems))
+            stats_data = dict(results)
 
             # Fetch S.M.A.R.T. devices data
             smart_devices = {}
@@ -63,13 +81,24 @@ async def async_setup_entry(hass, entry):
                             'serial': getattr(device, 'serial', ''),
                             'firmware': getattr(device, 'firmware', ''),
                         })
-                LOGGER.debug(f"Loaded S.M.A.R.T. data for {len(all_smart)} devices")
+                LOGGER.debug(
+                    "Loaded S.M.A.R.T. data for %d devices across %d systems",
+                    len(all_smart),
+                    len(smart_devices),
+                )
             except Exception as e:
-                LOGGER.warning(f"Failed to fetch S.M.A.R.T. devices: {e}")
+                LOGGER.warning("Failed to fetch S.M.A.R.T. devices: %s", e, exc_info=True)
 
+            LOGGER.info(
+                "Beszel update successful: systems=%d stats=%d smart_devices=%d systems_with_smart=%d",
+                len(systems),
+                len(stats_data),
+                sum(len(devices) for devices in smart_devices.values()),
+                len(smart_devices),
+            )
             return {"systems": systems, "stats": stats_data, "smart_devices": smart_devices}
         except Exception as err:
-            LOGGER.error(f"Error fetching systems: {err}")
+            LOGGER.error("Error fetching systems: %s", err, exc_info=True)
             raise UpdateFailed(f"Error fetching systems: {err}")
 
     coordinator = DataUpdateCoordinator(
@@ -88,7 +117,7 @@ async def async_setup_entry(hass, entry):
         try:
             return await hass.async_add_executor_job(update_api.get_update_info)
         except Exception as err:
-            LOGGER.error(f"Error fetching hub update info: {err}")
+            LOGGER.error("Error fetching hub update info: %s", err, exc_info=True)
             raise UpdateFailed(f"Error fetching hub update info: {err}")
     coordinator_hub = DataUpdateCoordinator(
         hass,
@@ -103,7 +132,7 @@ async def async_setup_entry(hass, entry):
         if coordinator_hub is not None:
             await coordinator_hub.async_config_entry_first_refresh()
     except Exception as e:
-        LOGGER.error(f"Failed to initialize coordinator: {e}")
+        LOGGER.error("Failed to initialize coordinator for entry %s: %s", entry.entry_id, e, exc_info=True)
         raise
 
     hass.data[DOMAIN][entry.entry_id] = {
@@ -114,12 +143,23 @@ async def async_setup_entry(hass, entry):
     try:
         await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     except Exception as e:
-        LOGGER.error(f"Failed to setup platforms: {e}")
+        LOGGER.error("Failed to setup platforms for entry %s: %s", entry.entry_id, e, exc_info=True)
         raise
+    LOGGER.debug("Successfully set up Beszel platforms for entry %s", entry.entry_id)
     return True
 
 async def async_unload_entry(hass, entry):
     """Unload a config entry."""
+    # Close coordinator to stop updates and cleanup connections
+    data = hass.data[DOMAIN].get(entry.entry_id)
+    if data:
+        coordinator = data.get("coordinator")
+        if coordinator:
+            coordinator.async_shutdown()
+        hub_coordinator = data.get("hub")
+        if hub_coordinator:
+            hub_coordinator.async_shutdown()
+    
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unload_ok:
         hass.data[DOMAIN].pop(entry.entry_id)

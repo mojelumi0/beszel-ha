@@ -1,13 +1,20 @@
 {
   "config": {
+    "error": {
+      "cannot_connect": "Verbindung zur Beszel-Instanz fehlgeschlagen.",
+      "invalid_auth": "Ungültiger Benutzername oder Passwort.",
+      "invalid_url": "Die URL muss mit http:// oder https:// beginnen.",
+      "invalid_update_interval": "Das Updateintervall muss zwischen 10 und 3600 Sekunden liegen.",
+      "unknown": "Unerwarteter Fehler aufgetreten."
+    },
     "step": {
       "user": {
         "title": "Beszel API konfigurieren",
         "description": "Gib deine Beszel API Verbindungsdaten ein",
         "data": {
           "url": "URL",
-          "username": "Benutzername (optional)",
-          "password": "Passwort (optional)",
+          "username": "Benutzername",
+          "password": "Passwort",
           "update_interval": "API Updateintervall in Sekunden",
           "verify_ssl": "Beszel API SSL Zertifikat überprüfen"
         }
@@ -15,14 +22,21 @@
     }
   },
   "options": {
+    "error": {
+      "cannot_connect": "Verbindung zur Beszel-Instanz fehlgeschlagen.",
+      "invalid_auth": "Ungültiger Benutzername oder Passwort.",
+      "invalid_url": "Die URL muss mit http:// oder https:// beginnen.",
+      "invalid_update_interval": "Das Updateintervall muss zwischen 10 und 3600 Sekunden liegen.",
+      "unknown": "Unerwarteter Fehler aufgetreten."
+    },
     "step": {
       "init": {
         "title": "Beszel API ändern",
         "description": "Ändere deine Beszel API Verbindungsdaten",
         "data": {
           "url": "URL",
-          "username": "Benutzername (optional)",
-          "password": "Passwort (optional)",
+          "username": "Benutzername",
+          "password": "Passwort",
           "update_interval": "API Updateintervall in Sekunden",
           "verify_ssl": "Beszel API SSL Zertifikat überprüfen"
         }

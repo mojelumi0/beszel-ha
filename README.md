@@ -1,36 +1,80 @@
-# Installation
+# Beszel API for Home Assistant
 
-[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Ronjar&repository=beszel-ha&category=integration)
+[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=mojelumi0&repository=beszel-ha&category=integration)
+[![Validate with hassfest](https://github.com/mojelumi0/beszel-ha/actions/workflows/hassfest.yml/badge.svg)](https://github.com/mojelumi0/beszel-ha/actions/workflows/hassfest.yml)
+[![HACS Validate](https://github.com/mojelumi0/beszel-ha/actions/workflows/validate.yaml/badge.svg)](https://github.com/mojelumi0/beszel-ha/actions/workflows/validate.yaml)
 
-1. Install the Beszel API addon via HACS from the link above or by searching for it inside of HACS
-2. Restart HomeAssistant
-3. Go to integrations, press Add integration and search for BeszelAPI
-4. In the Setup Dialog use the following values
-    - *URL*: The root url / IP of your Beszel instance, like http://beszel.example.com or https://beszel.example.com
-    - *user*: Either your default admin username / email or (recommended) create another user with the role user and assigning the agents you want to expose to it.
-    - *password*: The password to the user
-5. The API will pull the data and reload every 2 minutes
+A [Beszel](https://beszel.dev) monitoring integration for Home Assistant. Connects to your Beszel Hub's REST API and exposes your monitored systems, their disks and the Hub itself as native Home Assistant entities.
 
-Currently all machines are added, selection will be added later (you can change this yourself by creating a new user in Beszel's PocketBase and adding this user only to the machines you want to be monitored).
+## About this fork
 
-# Usage
-After installing the following entities will exposed as sensors (more to come):
-- Status (Connection)
-- Uptime (Minutes)
-- CPU (Percentage)
-- Disk usage (Percentage)
-- Temperature (°C)
-- Bandwidth (Mbit/s)
-- RAM (Percentage)
-- Battery (Percentage)
+This repository is a fork of [ronjar/beszel-ha](https://github.com/ronjar/beszel-ha) — all credit for the original integration, its architecture and the initial idea goes to **[Ronjar](https://github.com/ronjar)**. If you find this useful, please check out and support the original project as well.
 
-For example if your machine is named *test*, CPU will be available as ```sensor.test_cpu```
+Since forking, this version has been extended with the help of **GitHub Copilot**, and the resulting code was additionally reviewed by **Claude Sonnet 5** (Anthropic) for bugs, edge cases, and security issues — including authentication handling, crash-prone code paths, and config-flow validation. Every AI-assisted change was reviewed, tested, and verified by a human maintainer before being merged; nothing went in unchecked.
 
-# Examples
-Here is one of my machines with the entities the integration currently exports
+Notable changes compared to the original repository:
+- New sensors: GPU usage, SWAP, RAM/Disk totals, network send/receive, additional (EFS) mounted disks, S.M.A.R.T. disk health, and a Beszel Hub update entity
+- More robust authentication: the integration now automatically re-authenticates instead of getting permanently stuck after a single failed login or an expired session
+- Config flow hardening: username/password are now required fields (Beszel does not support anonymous/unauthenticated access) and the password field is masked in the UI
+- System stats are now fetched in parallel instead of one-by-one, reducing polling time when you have several systems
+- Various crash fixes (uptime and battery sensors, device-info handling on incomplete data)
+
+## Installation
+
+1. Install the Beszel API integration via HACS using the badge above, or by adding this repository manually as a custom repository in HACS
+2. Restart Home Assistant
+3. Go to **Settings → Devices & Services → Add Integration** and search for "Beszel API"
+4. In the setup dialog, provide:
+    - **URL**: the root URL of your Beszel instance, e.g. `http://beszel.example.com` or `https://beszel.example.com`
+    - **Username**: a Beszel user account (required — anonymous access is not supported by Beszel). Recommended: create a dedicated user in Beszel's PocketBase admin UI and only assign it the systems you want exposed to Home Assistant, instead of using your main admin account
+    - **Password**: the password for that user
+    - **Update interval**: how often to poll Beszel, in seconds (10–3600, default 120)
+    - **Verify SSL**: whether to verify the Beszel instance's SSL certificate
+5. The integration will poll Beszel on the configured interval and create entities for every system the given user has access to
+
+Currently all systems the user has access to are added automatically; per-system selection isn't built into the config flow yet. In the meantime, you can control this from the Beszel side by creating a Beszel user that's only assigned to the systems you want monitored in Home Assistant.
+
+You can change the URL, credentials, update interval or SSL verification at any time via **Settings → Devices & Services → Beszel API → Configure**.
+
+## Usage
+
+After installing, the following entities are exposed per monitored system (more may appear automatically depending on what your Beszel agent reports):
+
+### Sensors
+| Entity | Unit | Notes |
+|---|---|---|
+| CPU | % | |
+| GPU | % | One per detected GPU, with VRAM/power draw as attributes |
+| RAM | % | Total RAM available as a separate `_ram_total` sensor (GB) |
+| SWAP | % | Only created if the system reports swap usage |
+| Disk | % | Total disk size available as a separate `_disk_total` sensor (GB) |
+| Additional disks (EFS) | % | One per extra mounted disk reported by the agent |
+| Bandwidth | MB/s | |
+| Network Receive | kB/s | |
+| Network Send | kB/s | |
+| Temperature | °C | Only created if the system reports temperature sensors |
+| Uptime | min | |
+| Battery | % | Only created if the system reports battery data |
+
+### Binary sensors
+| Entity | Notes |
+|---|---|
+| Status | Connectivity — on when the system is reachable |
+| S.M.A.R.T. | One per disk; "problem" state if the disk's S.M.A.R.T. health check has failed, with temperature, capacity, power-on hours/cycles, model, serial and firmware as attributes |
+
+### Update entity
+| Entity | Notes |
+|---|---|
+| Beszel Hub Update | Shows whether a newer Beszel Hub version is available (only created if update checking is enabled on your Hub) |
+
+For example, if your machine is named *test*, CPU will be available as `sensor.test_cpu`.
+
+## Examples
+
+Here is one of my machines with the entities the integration currently exports:
 ![Screenshot from HomeAssistant settings page of my device and its entities](/pictures/sensors.png)
 
-And here one card I created for myself using those sensors:
+And here a card I created for myself using those sensors:
 ![Screenshot from HomeAssistant dashboard with a card showing CPU, RAM and Disk usage as bar charts](/pictures/example_card.png)
 
 The YAML for this card layout:
@@ -79,3 +123,11 @@ cards:
     positions:
       indicator: "off"
 ```
+
+## Credits & License
+
+- Original integration by Ronjar - [ronjar/beszel-ha](https://github.com/ronjar/beszel-ha)
+- Beszel monitoring software by [henrygd](https://github.com/henrygd/beszel)
+- This fork got extended with GitHub Copilot and Claude Sonnet 5 (Anthropic), maintained by [mojelumi0](https://github.com/mojelumi0)
+
+Licensed under the MIT License — see [LICENSE](LICENSE)

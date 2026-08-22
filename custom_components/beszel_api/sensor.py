@@ -68,14 +68,24 @@ class BeszelBaseSensor(CoordinatorEntity, SensorEntity):
     def __init__(self, coordinator, system):
         super().__init__(coordinator)
         self._system_id = system.id
+        self._system_cache = None
 
     @property
     def system(self):
-        systems = self.coordinator.data['systems']
+        if self._system_cache is not None:
+            return self._system_cache
+
+        systems = self.coordinator.data.get('systems', [])
         for s in systems:
             if s.id == self._system_id:
+                self._system_cache = s
                 return s
         return None
+
+    def _handle_coordinator_update(self) -> None:
+        """Handle updated data from the coordinator."""
+        self._system_cache = None
+        super()._handle_coordinator_update()
 
     @property
     def stats_data(self):
@@ -86,7 +96,7 @@ class BeszelBaseSensor(CoordinatorEntity, SensorEntity):
         sys = self.system
         if sys is None:
             return None
-        info = getattr(sys, "info", {})
+        info = getattr(sys, "info", None) or {}
         return {
             "identifiers": {(DOMAIN, sys.id)},
             "name": sys.name,
@@ -471,7 +481,10 @@ class BeszelUptimeSensor(BeszelBaseSensor):
 
     @property
     def native_value(self):
-        return self.system.info.get("u") / 60 if self.system else None
+        if not self.system:
+            return None
+        uptime_seconds = self.system.info.get("u")
+        return uptime_seconds / 60 if uptime_seconds is not None else None
 
     @property
     def suggested_display_precision(self):
@@ -559,9 +572,10 @@ class BeszelBatterySensor(BeszelBaseSensor):
 
     @property
     def icon(self):
-        if not self.stats_data and "bat" not in self.stats_data:
+        bat = self.stats_data.get("bat") if self.stats_data else None
+        if not bat:
             return "mdi:battery-unknown"
-        level, state = self.stats_data.get("bat")
+        level, state = bat
         # https://github.com/henrygd/beszel/blob/4d05bfdff0ec90b68e820ad5dc32a5c4bccf8f0f/internal/site/src/lib/enums.ts#L41-L48
         charging = state == 3
 
@@ -577,9 +591,10 @@ class BeszelBatterySensor(BeszelBaseSensor):
 
     @property
     def native_value(self):
-        if not self.stats_data:
+        bat = self.stats_data.get("bat") if self.stats_data else None
+        if not bat:
             return None
-        return self.stats_data.get("bat")[0]
+        return bat[0]
 
     @property
     def native_unit_of_measurement(self):
