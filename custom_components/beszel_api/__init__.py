@@ -38,29 +38,26 @@ async def async_setup_entry(hass, entry):
                 LOGGER.warning("No systems found in Beszel API")
                 return {"systems": [], "stats": {}}
 
-            # Create a stats dictionary to store stats by system ID
-            stats_data = {}
-
-            # Fetch system stats for each system
-            for system in systems:
+            # Fetch stats for all systems concurrently instead of one by one
+            async def _fetch_stats(system):
+                system_name = getattr(system, "name", system.id)
                 try:
-                    system_name = getattr(system, "name", system.id)
                     LOGGER.debug("Fetching stats for system %s (%s)", system_name, system.id)
                     stats = await hass.async_add_executor_job(client.get_system_stats, system.id)
-                    if stats:
-                        # Store stats in the stats dictionary
-                        stats_data[system.id] = stats.stats if hasattr(stats, 'stats') else {}
-                        LOGGER.debug(
-                            "Received stats for system %s (%s) with keys: %s",
-                            system_name,
-                            system.id,
-                            ", ".join(stats_data[system.id].keys()) if stats_data[system.id] else "none",
-                        )
-                    else:
-                        stats_data[system.id] = {}
+                    data = stats.stats if stats and hasattr(stats, "stats") else {}
+                    LOGGER.debug(
+                        "Received stats for system %s (%s) with keys: %s",
+                        system_name,
+                        system.id,
+                        ", ".join(data.keys()) if data else "none",
+                    )
+                    return system.id, data
                 except Exception as e:
                     LOGGER.warning("Failed to fetch stats for system %s: %s", system.id, e, exc_info=True)
-                    stats_data[system.id] = {}
+                    return system.id, {}
+
+            results = await asyncio.gather(*(_fetch_stats(system) for system in systems))
+            stats_data = dict(results)
 
             # Fetch S.M.A.R.T. devices data
             smart_devices = {}
