@@ -126,8 +126,8 @@ cards:
 
 ## Credits & License
 
-- Original integration by Ronjar - ronjar/beszel-ha
-- Beszel monitoring software by henrygd
-- This fork got extended with GitHub Copilot and Claude Sonnet 5 (Anthropic), maintained by mojelumi0
+- Original integration by Ronjar - [ronjar/beszel-ha](https://github.com/ronjar/beszel-ha)
+- Beszel monitoring software by [henrygd](https://github.com/henrygd/beszel)
+- This fork got extended with GitHub Copilot and Claude Sonnet 5 (Anthropic), maintained by [mojelumi0](https://github.com/mojelumi0)
 
-Licensed under the MIT License — see LICENSE.
+Licensed under the MIT License — see [LICENSE](LICENSE)
