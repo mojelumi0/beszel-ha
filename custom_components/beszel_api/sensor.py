@@ -36,7 +36,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
                 if system.info.get("dt") is not None:
                     entities.append(BeszelTemperatureSensor(coordinator, system))
 
-                if system_stats and 'su' in system_stats:
+                if system_stats and 's' in system_stats:
                     entities.append(BeszelSWAPSensor(coordinator, system))
 
                 if system_stats and 'g' in system_stats:
@@ -240,13 +240,12 @@ class BeszelSWAPSensor(BeszelBaseSensor):
     
     @property
     def available(self):
-        swap_used = self.stats_data.get("su")
         swap_total = self.stats_data.get("s")
-        return swap_used is not None and swap_total is not None and swap_total > 0
+        return swap_total is not None and swap_total > 0
 
     @property
     def native_value(self):
-        swap_used = self.stats_data.get("su")
+        swap_used = self.stats_data.get("su", 0)
         swap_total = self.stats_data.get("s")
         if self.available:
             return (swap_used / swap_total * 100)
@@ -269,7 +268,7 @@ class BeszelSWAPSensor(BeszelBaseSensor):
         """Total and Used SWAP in GB"""
 
         attributes = {}
-        attributes['swap_used_gb'] = self.stats_data.get("su")
+        attributes['swap_used_gb'] = self.stats_data.get("su", 0)
         attributes['swap_total_gb'] = self.stats_data.get("s")
 
         return attributes
