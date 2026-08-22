@@ -13,8 +13,8 @@
         "description": "Introduce los datos de conexión de la API de Beszel",
         "data": {
           "url": "URL",
-          "username": "Usuario (opcional)",
-          "password": "Contraseña (opcional)",
+          "username": "Usuario",
+          "password": "Contraseña",
           "update_interval": "Intervalo de actualización de la API en segundos",
           "verify_ssl": "Verificar el certificado SSL de la API de Beszel"
         }
@@ -35,8 +35,8 @@
         "description": "Cambia los datos de conexión de la API de Beszel",
         "data": {
           "url": "URL",
-          "username": "Usuario (opcional)",
-          "password": "Contraseña (opcional)",
+          "username": "Usuario",
+          "password": "Contraseña",
           "update_interval": "Intervalo de actualización de la API en segundos",
           "verify_ssl": "Verificar el certificado SSL de la API de Beszel"
         }
