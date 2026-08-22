@@ -88,8 +88,10 @@ def _build_schema(defaults: Optional[Mapping[str, Any]] = None) -> vol.Schema:
     return vol.Schema(
         {
             vol.Required(CONF_URL, default=data.get(CONF_URL, "")): str,
-            vol.Optional(CONF_USERNAME, default=data.get(CONF_USERNAME, "")): str,
-            vol.Optional(CONF_PASSWORD, default=data.get(CONF_PASSWORD, "")): str,
+            vol.Required(CONF_USERNAME, default=data.get(CONF_USERNAME, "")): str,
+            vol.Required(CONF_PASSWORD, default=data.get(CONF_PASSWORD, "")): TextSelector(
+                TextSelectorConfig(type=TextSelectorType.PASSWORD)
+            ),
             vol.Optional(
                 CONF_UPDATE_INTERVAL,
                 default=data.get(CONF_UPDATE_INTERVAL, 120),
