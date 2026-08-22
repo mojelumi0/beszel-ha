@@ -1,0 +1,25 @@
+name: Check release version matches manifest
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  check-version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.target_commitish }}
+
+      - name: Compare tag to manifest.json version
+        run: |
+          TAG="${{ github.event.release.tag_name }}"
+          TAG="${TAG#v}"
+          MANIFEST_VERSION=$(jq -r '.version' custom_components/beszel_api/manifest.json)
+          echo "Release tag (normalisiert): $TAG"
+          echo "manifest.json Version:      $MANIFEST_VERSION"
+          if [ "$TAG" != "$MANIFEST_VERSION" ]; then
+            echo "::error::Release-Tag ($TAG) stimmt nicht mit manifest.json ($MANIFEST_VERSION) überein – HACS zeigt sonst einen Versions-Mismatch."
+            exit 1
+          fi
