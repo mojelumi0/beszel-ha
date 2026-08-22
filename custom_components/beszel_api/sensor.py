@@ -569,9 +569,10 @@ class BeszelBatterySensor(BeszelBaseSensor):
 
     @property
     def icon(self):
-        if not self.stats_data and "bat" not in self.stats_data:
+        bat = self.stats_data.get("bat") if self.stats_data else None
+        if not bat:
             return "mdi:battery-unknown"
-        level, state = self.stats_data.get("bat")
+        level, state = bat
         # https://github.com/henrygd/beszel/blob/4d05bfdff0ec90b68e820ad5dc32a5c4bccf8f0f/internal/site/src/lib/enums.ts#L41-L48
         charging = state == 3
 
