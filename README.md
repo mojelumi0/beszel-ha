@@ -1,8 +1,8 @@
 # Beszel API for Home Assistant
 
 [![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=mojelumi0&repository=beszel-ha&category=integration)
-[![Validate with hassfest](https://github.com/mojelumi0/beszel-ha/actions/workflows/hassfest.yml/badge.svg?branch=copilot/refactor-beszel-ha-integration)](https://github.com/mojelumi0/beszel-ha/actions/workflows/hassfest.yml)
-[![HACS Validate](https://github.com/mojelumi0/beszel-ha/actions/workflows/validate.yaml/badge.svg?branch=copilot/refactor-beszel-ha-integration)](https://github.com/mojelumi0/beszel-ha/actions/workflows/validate.yaml)
+[![Validate with hassfest](https://github.com/mojelumi0/beszel-ha/actions/workflows/hassfest.yml/badge.svg)](https://github.com/mojelumi0/beszel-ha/actions/workflows/hassfest.yml)
+[![HACS Validate](https://github.com/mojelumi0/beszel-ha/actions/workflows/validate.yaml/badge.svg)](https://github.com/mojelumi0/beszel-ha/actions/workflows/validate.yaml)
 
 A [Beszel](https://beszel.dev) monitoring integration for Home Assistant. Connects to your Beszel Hub's REST API and exposes your monitored systems, their disks and the Hub itself as native Home Assistant entities.
 
