@@ -10,7 +10,7 @@ A [Beszel](https://beszel.dev) monitoring integration for Home Assistant. Connec
 
 This repository is a fork of [ronjar/beszel-ha](https://github.com/ronjar/beszel-ha) — all credit for the original integration, its architecture and the initial idea goes to **[Ronjar](https://github.com/ronjar)**. If you find this useful, please check out and support the original project as well.
 
-Since forking, this version has been extended with the help of **GitHub Copilot**, and the resulting code was additionally reviewed by **Claude Sonnet 5** (Anthropic) for bugs, edge cases, and security issues — including authentication handling, crash-prone code paths, and config-flow validation. Every AI-assisted change was reviewed, tested, and verified by a human maintainer before being merged; nothing went in unchecked.
+Since forking, this version has been extended with the help of **GitHub Copilot**, **Claude Sonnet 5** (Anthropic), and **OpenAI Codex**. AI-assisted changes are reviewed by the maintainer and validated with automated checks and focused runtime testing before release.
 
 Notable changes compared to the original repository:
 - New sensors: GPU usage, SWAP, RAM/Disk totals, network send/receive, additional (EFS) mounted disks, S.M.A.R.T. disk health, and a Beszel Hub update entity
@@ -45,13 +45,13 @@ After installing, the following entities are exposed per monitored system (more 
 |---|---|---|
 | CPU | % | |
 | GPU | % | One per detected GPU, with VRAM/power draw as attributes |
-| RAM | % | Total RAM available as a separate `_ram_total` sensor (GB) |
+| RAM | % | Total RAM available as a separate `_ram_total` sensor (GiB) |
 | SWAP | % | Only created if the system reports swap usage |
-| Disk | % | Total disk size available as a separate `_disk_total` sensor (GB) |
+| Disk | % | Total disk size available as a separate `_disk_total` sensor (GiB) |
 | Additional disks (EFS) | % | One per extra mounted disk reported by the agent |
-| Bandwidth | MB/s | |
-| Network Receive | kB/s | |
-| Network Send | kB/s | |
+| Bandwidth | MiB/s | Combined send and receive rate |
+| Network Receive | KiB/s | |
+| Network Send | KiB/s | |
 | Temperature | °C | Only created if the system reports temperature sensors |
 | Uptime | min | |
 | Battery | % | Only created if the system reports battery data |
@@ -128,6 +128,6 @@ cards:
 
 - Original integration by Ronjar - [ronjar/beszel-ha](https://github.com/ronjar/beszel-ha)
 - Beszel monitoring software by [henrygd](https://github.com/henrygd/beszel)
-- This fork got extended with GitHub Copilot and Claude Sonnet 5 (Anthropic), maintained by [mojelumi0](https://github.com/mojelumi0)
+- This fork got extended with GitHub Copilot, Claude Sonnet 5 (Anthropic), and OpenAI Codex, maintained by [mojelumi0](https://github.com/mojelumi0)
 
 Licensed under the MIT License — see [LICENSE](LICENSE)
