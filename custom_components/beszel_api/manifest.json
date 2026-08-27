@@ -7,7 +7,6 @@
   "documentation": "https://github.com/mojelumi0/beszel-ha",
   "iot_class": "local_polling",
   "issue_tracker": "https://github.com/mojelumi0/beszel-ha/issues",
-  "requirements": ["pocketbase>=0.17.0"],
-  "version": "1.2.1"
+  "requirements": ["pocketbase==0.17.3"],
+  "version": "1.2.2"
 }
-

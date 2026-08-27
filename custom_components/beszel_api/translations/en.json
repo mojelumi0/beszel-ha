@@ -1,5 +1,9 @@
 {
   "config": {
+    "abort": {
+      "already_configured": "This Beszel Hub is already configured.",
+      "reauth_successful": "Reauthentication was successful."
+    },
     "error": {
       "cannot_connect": "Failed to connect to the Beszel instance.",
       "invalid_auth": "Invalid username or password.",
@@ -18,6 +22,14 @@
           "update_interval": "API update interval in seconds",
           "verify_ssl": "Verify Beszel API SSL certificate"
         }
+      },
+      "reauth_confirm": {
+        "title": "Reauthenticate Beszel API",
+        "description": "Your Beszel credentials are no longer valid. Enter valid credentials to reconnect.",
+        "data": {
+          "username": "Username",
+          "password": "Password"
+        }
       }
     }
   },
@@ -31,16 +43,16 @@
     },
     "step": {
       "init": {
-          "title": "Update Beszel API configuration",
-          "description": "Change your Beszel API connection details",
-          "data": {
-            "url": "URL",
-            "username": "Username",
-            "password": "Password",
+        "title": "Update Beszel API configuration",
+        "description": "Change your Beszel API connection details",
+        "data": {
+          "url": "URL",
+          "username": "Username",
+          "password": "Password",
           "update_interval": "API update interval in seconds",
-            "verify_ssl": "Verify Beszel API SSL certificate"
-          }
+          "verify_ssl": "Verify Beszel API SSL certificate"
         }
+      }
     }
   }
 }

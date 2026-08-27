@@ -1,6 +1,8 @@
 from homeassistant.components.update import UpdateEntity, UpdateEntityFeature
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+
 from .const import DOMAIN, LOGGER
+
 
 async def async_setup_entry(hass, entry, async_add_entities):
     data = hass.data[DOMAIN][entry.entry_id]
@@ -10,7 +12,8 @@ async def async_setup_entry(hass, entry, async_add_entities):
         LOGGER.debug("Update check is disabled, skipping Beszel Hub Update entity")
         return
     
-    if not hub_coordinator.data.get("check_update", False):
+    hub_data = hub_coordinator.data or {}
+    if not hub_data.get("check_update", False):
         return
     
     async_add_entities([BeszelHubUpdate(hub_coordinator, entry.entry_id, entry.data.get("url"))])
