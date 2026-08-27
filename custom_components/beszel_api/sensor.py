@@ -159,6 +159,22 @@ class BeszelCPUSensor(BeszelBaseSensor):
     def state_class(self):
         return SensorStateClass.MEASUREMENT
 
+    @property
+    def extra_state_attributes(self):
+        """Return per-core CPU usage reported by Beszel."""
+        if not self.available:
+            return {}
+
+        cores = self.stats_data.get("cpus")
+        if not isinstance(cores, (list, tuple)) or not cores:
+            return {}
+
+        attributes = {"cpu_core_count": len(cores)}
+        for index, usage in enumerate(cores):
+            if isinstance(usage, (int, float)) and not isinstance(usage, bool):
+                attributes[f"cpu_core_{index}"] = usage
+        return attributes
+
 
 class BeszelGPUSensor(BeszelBaseSensor):
     def __init__(self, coordinator, system, gpu_key):
