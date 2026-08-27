@@ -1,0 +1,50 @@
+name: Feature request
+description: Suggest an improvement or an additional Beszel metric.
+title: "[Enhancement]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting an improvement. For new metrics, please include an
+        example of the field returned by Beszel or a link to its documentation.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or use case
+      description: What would you like to monitor or automate in Home Assistant?
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: Describe the entity, attribute, or behavior you would like added.
+    validations:
+      required: true
+
+  - type: textarea
+    id: beszel_data
+    attributes:
+      label: Available Beszel data
+      description: Include the relevant API field, sample payload, or upstream source link when known.
+      render: json
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Describe any template sensors, automations, or other workarounds you tried.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I searched existing issues and pull requests for this feature.
+          required: true
+        - label: This request is about the Home Assistant integration, not Beszel itself.
+          required: true
