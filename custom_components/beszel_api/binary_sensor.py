@@ -1,9 +1,11 @@
 from homeassistant.components.binary_sensor import (
-    BinarySensorEntity,
     BinarySensorDeviceClass,
+    BinarySensorEntity,
 )
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+
 from .const import DOMAIN, LOGGER, SMART_CURATED_ATTRIBUTES
+
 
 async def async_setup_entry(hass, entry, async_add_entities):
     data = hass.data[DOMAIN][entry.entry_id]
@@ -24,13 +26,17 @@ async def async_setup_entry(hass, entry, async_add_entities):
                 system_smart_devices = smart_devices_data.get(system.id, [])
                 for device in system_smart_devices:
                     entities.append(BeszelSmartBinarySensor(coordinator, system, device))
-                    LOGGER.info(f"Created S.M.A.R.T. sensor for {system.name} - {device.get('name', 'unknown')}")
+                    LOGGER.debug(
+                        "Created S.M.A.R.T. sensor for %s - %s",
+                        system.name,
+                        device.get("name", "unknown"),
+                    )
 
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 LOGGER.error(f"Failed to create binary sensors for system {system.name if hasattr(system, 'name') else 'unknown'}: {e}")
                 continue
 
-        LOGGER.info(f"Created {len(entities)} binary sensors total")
+        LOGGER.debug("Created %d binary sensors total", len(entities))
         async_add_entities(entities)
     except Exception as e:
         LOGGER.error(f"Failed to setup binary sensors: {e}")
@@ -50,6 +56,11 @@ class BeszelBaseBinarySensor(CoordinatorEntity, BinarySensorEntity):
             if s.id == self._system_id:
                 return s
         return None
+
+    @property
+    def available(self):
+        """Return availability based on the Hub update and system presence."""
+        return self.coordinator.last_update_success and self.system is not None
 
     @property
     def device_info(self):
@@ -111,6 +122,15 @@ class BeszelSmartBinarySensor(BeszelBaseBinarySensor):
         return f"beszel_{self._system_id}_{self._device_id}_smart"
 
     @property
+    def available(self):
+        """Hide stale S.M.A.R.T. data while the monitored agent is offline."""
+        return (
+            super().available
+            and getattr(self.system, "status", None) == "up"
+            and bool(self._smart_device_data)
+        )
+
+    @property
     def name(self):
         device_data = self._smart_device_data
         model = device_data.get('model', self._disk_name)
@@ -128,9 +148,12 @@ class BeszelSmartBinarySensor(BeszelBaseBinarySensor):
         if not device_data:
             return None
         
-        state = device_data.get('state', '')
-        # state is 'PASSED' or 'FAILED'
-        return state != 'PASSED'
+        state = str(device_data.get("state", "")).upper()
+        if state == "PASSED":
+            return False
+        if state in {"WARNING", "FAILED"}:
+            return True
+        return None
 
     @property
     def device_class(self):
@@ -165,11 +188,14 @@ class BeszelSmartBinarySensor(BeszelBaseBinarySensor):
             attributes['temperature'] = temp
             attributes['temperature_unit'] = '°C'
         
-        # Capacity (convert bytes to GB)
+        # Keep the established (historically binary) GB/TB attributes for
+        # compatibility and add correctly named IEC equivalents.
         capacity = device_data.get('capacity', 0)
         if capacity:
             attributes['capacity_gb'] = round(capacity / (1024**3), 2)
             attributes['capacity_tb'] = round(capacity / (1024**4), 2)
+            attributes['capacity_gib'] = round(capacity / (1024**3), 2)
+            attributes['capacity_tib'] = round(capacity / (1024**4), 2)
         
         # Power on hours
         hours = device_data.get('hours')
