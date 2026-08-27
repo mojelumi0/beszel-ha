@@ -1,4 +1,4 @@
-blank_issues_enabled: false
+blank_issues_enabled: true
 contact_links:
   - name: Beszel upstream issues
     url: https://github.com/henrygd/beszel/issues
