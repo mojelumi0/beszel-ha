@@ -1,5 +1,9 @@
 {
   "config": {
+    "abort": {
+      "already_configured": "Este Hub de Beszel ya está configurado.",
+      "reauth_successful": "La reautenticación se completó correctamente."
+    },
     "error": {
       "cannot_connect": "No se pudo conectar a la instancia de Beszel.",
       "invalid_auth": "Nombre de usuario o contraseña no válidos.",
@@ -17,6 +21,14 @@
           "password": "Contraseña",
           "update_interval": "Intervalo de actualización de la API en segundos",
           "verify_ssl": "Verificar el certificado SSL de la API de Beszel"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Volver a autenticar la API de Beszel",
+        "description": "Tus credenciales de Beszel ya no son válidas. Introduce credenciales válidas para volver a conectar.",
+        "data": {
+          "username": "Usuario",
+          "password": "Contraseña"
         }
       }
     }
