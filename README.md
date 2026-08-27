@@ -1,133 +1,374 @@
+<div align="center">
+
 # Beszel API for Home Assistant
 
-[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=mojelumi0&repository=beszel-ha&category=integration)
-[![Validate with hassfest](https://github.com/mojelumi0/beszel-ha/actions/workflows/hassfest.yml/badge.svg)](https://github.com/mojelumi0/beszel-ha/actions/workflows/hassfest.yml)
-[![HACS Validate](https://github.com/mojelumi0/beszel-ha/actions/workflows/validate.yaml/badge.svg)](https://github.com/mojelumi0/beszel-ha/actions/workflows/validate.yaml)
+Bring your Beszel systems into Home Assistant with native sensors, diagnostics, update information, and dashboard-ready entities.
 
-A [Beszel](https://beszel.dev) monitoring integration for Home Assistant. Connects to your Beszel Hub's REST API and exposes your monitored systems, their disks and the Hub itself as native Home Assistant entities.
+[![Latest release](https://img.shields.io/github/v/release/mojelumi0/beszel-ha?style=flat-square)](https://github.com/mojelumi0/beszel-ha/releases/latest)
+[![HACS](https://img.shields.io/badge/HACS-Custom-41BDF5.svg?style=flat-square)](https://my.home-assistant.io/redirect/hacs_repository/?owner=mojelumi0&repository=beszel-ha&category=integration)
+[![Tests](https://github.com/mojelumi0/beszel-ha/actions/workflows/tests.yml/badge.svg)](https://github.com/mojelumi0/beszel-ha/actions/workflows/tests.yml)
+[![Hassfest](https://github.com/mojelumi0/beszel-ha/actions/workflows/hassfest.yml/badge.svg)](https://github.com/mojelumi0/beszel-ha/actions/workflows/hassfest.yml)
+[![HACS validation](https://github.com/mojelumi0/beszel-ha/actions/workflows/validate.yaml/badge.svg)](https://github.com/mojelumi0/beszel-ha/actions/workflows/validate.yaml)
+[![License](https://img.shields.io/github/license/mojelumi0/beszel-ha?style=flat-square)](LICENSE)
 
-## About this fork
+[Install with HACS](https://my.home-assistant.io/redirect/hacs_repository/?owner=mojelumi0&repository=beszel-ha&category=integration) · [Releases](https://github.com/mojelumi0/beszel-ha/releases) · [Report an issue](https://github.com/mojelumi0/beszel-ha/issues)
 
-This repository is a fork of [ronjar/beszel-ha](https://github.com/ronjar/beszel-ha) — all credit for the original integration, its architecture and the initial idea goes to **[Ronjar](https://github.com/ronjar)**. If you find this useful, please check out and support the original project as well.
+</div>
 
-Since forking, this version has been extended with the help of **GitHub Copilot**, **Claude Sonnet 5** (Anthropic), and **OpenAI Codex**. AI-assisted changes are reviewed by the maintainer and validated with automated checks and focused runtime testing before release.
+## What this integration does
 
-Notable changes compared to the original repository:
-- New sensors: GPU usage, SWAP, RAM/Disk totals, network send/receive, additional (EFS) mounted disks, S.M.A.R.T. disk health, and a Beszel Hub update entity
-- More robust authentication: the integration now automatically re-authenticates instead of getting permanently stuck after a single failed login or an expired session
-- Config flow hardening: username/password are now required fields (Beszel does not support anonymous/unauthenticated access) and the password field is masked in the UI
-- System stats are now fetched in parallel instead of one-by-one, reducing polling time when you have several systems
-- Various crash fixes (uptime and battery sensors, device-info handling on incomplete data)
+Beszel already collects useful information about your servers. This integration makes that information available as native Home Assistant entities, ready for dashboards, history, automations, and notifications.
+
+- Local polling directly from your Beszel Hub
+- Automatic discovery of every system visible to the configured Beszel user
+- Configurable polling interval from 10 to 3600 seconds
+- Native Home Assistant device classes, state classes, and units
+- Automatic reauthentication and Home Assistant reauth flow
+- Parallel system-stat requests for faster updates with multiple systems
+- Optional S.M.A.R.T., load-average, fan, battery, and systemd diagnostics
+- Beszel Hub update entity when update checks are enabled in Beszel
 
 ## Installation
 
-1. Install the Beszel API integration via HACS using the badge above, or by adding this repository manually as a custom repository in HACS
-2. Restart Home Assistant
-3. Go to **Settings → Devices & Services → Add Integration** and search for "Beszel API"
-4. In the setup dialog, provide:
-    - **URL**: the root URL of your Beszel instance, e.g. `http://beszel.example.com` or `https://beszel.example.com`
-    - **Username**: a Beszel user account (required — anonymous access is not supported by Beszel). Recommended: create a dedicated user in Beszel's PocketBase admin UI and only assign it the systems you want exposed to Home Assistant, instead of using your main admin account
-    - **Password**: the password for that user
-    - **Update interval**: how often to poll Beszel, in seconds (10–3600, default 120)
-    - **Verify SSL**: whether to verify the Beszel instance's SSL certificate
-5. The integration will poll Beszel on the configured interval and create entities for every system the given user has access to
+### HACS
 
-Currently all systems the user has access to are added automatically; per-system selection isn't built into the config flow yet. In the meantime, you can control this from the Beszel side by creating a Beszel user that's only assigned to the systems you want monitored in Home Assistant.
+1. Select **Install with HACS** above, or open HACS and add this repository as a custom **Integration** repository:
 
-You can change the URL, credentials, update interval or SSL verification at any time via **Settings → Devices & Services → Beszel API → Configure**.
+   ```text
+   https://github.com/mojelumi0/beszel-ha
+   ```
 
-## Usage
+2. Download **Beszel API** in HACS.
+3. Restart Home Assistant.
+4. Open **Settings → Devices & services → Add integration**.
+5. Search for **Beszel API**.
 
-After installing, the following entities are exposed per monitored system (more may appear automatically depending on what your Beszel agent reports):
+### Manual installation
 
-### Sensors
-| Entity | Unit | Notes |
-|---|---|---|
-| CPU | % | |
-| GPU | % | One per detected GPU, with VRAM/power draw as attributes |
-| RAM | % | Total RAM available as a separate `_ram_total` sensor (GiB) |
-| SWAP | % | Only created if the system reports swap usage |
-| Disk | % | Total disk size available as a separate `_disk_total` sensor (GiB) |
-| Additional disks (EFS) | % | One per extra mounted disk reported by the agent |
-| Bandwidth | MiB/s | Combined send and receive rate |
-| Network Receive | KiB/s | |
-| Network Send | KiB/s | |
-| Temperature | °C | Only created if the system reports temperature sensors |
-| Uptime | min | |
-| Battery | % | Only created if the system reports battery data |
+1. Download the latest release.
+2. Copy `custom_components/beszel_api` into your Home Assistant `custom_components` directory.
+3. Restart Home Assistant.
+4. Add **Beszel API** from **Settings → Devices & services**.
 
-### Binary sensors
-| Entity | Notes |
+## Connecting to Beszel
+
+Enter the root address of your Beszel Hub, including `http://` or `https://`. A standard local Beszel installation listens on port `8090`.
+
+| Setup | Example URL |
 |---|---|
-| Status | Connectivity — on when the system is reachable |
-| S.M.A.R.T. | One per disk; "problem" state if the disk's S.M.A.R.T. health check has failed, with temperature, capacity, power-on hours/cycles, model, serial and firmware as attributes |
+| Local IP address | `http://192.168.1.50:8090` |
+| Local hostname | `http://beszel.local:8090` |
+| Local DNS name | `http://beszel.home.arpa:8090` |
+| Reverse proxy with HTTPS | `https://beszel.example.com` |
 
-### Update entity
-| Entity | Notes |
-|---|---|
-| Beszel Hub Update | Shows whether a newer Beszel Hub version is available (only created if update checking is enabled on your Hub) |
+In other words, for a normal local installation use:
 
-For example, if your machine is named *test*, CPU will be available as `sensor.test_cpu`.
-
-## Examples
-
-Here is one of my machines with the entities the integration currently exports:
-![Screenshot from HomeAssistant settings page of my device and its entities](/pictures/sensors.png)
-
-And here a card I created for myself using those sensors:
-![Screenshot from HomeAssistant dashboard with a card showing CPU, RAM and Disk usage as bar charts](/pictures/example_card.png)
-
-The YAML for this card layout:
-``` YAML
-type: custom:vertical-stack-in-card
-cards:
-  - type: horizontal-stack
-    cards:
-      - type: custom:mushroom-template-card
-        primary: Evergreen
-        icon: mdi:server
-        secondary: ""
-        icon_color: |-
-          {% if states('binary_sensor.evergreen_status') | bool %}
-            green
-          {% else %}
-            red
-          {% endif %}
-        fill_container: false
-        multiline_secondary: false
-        entity: binary_sensor.evergreen_status
-      - type: custom:mushroom-template-card
-        entity: sensor.evergreen_uptime
-        icon: mdi:sort-clock-descending
-        primary: "{{ (states('sensor.evergreen_uptime') | int / 1440) | int  }} Days"
-        secondary: ""
-        icon_color: blue
-        card_mod:
-          style: |
-            ha-card {
-              margin: 0 10px;
-              align-items: end;
-              box-shadow: none;
-            }
-  - type: custom:bar-card
-    entities:
-      - entity: sensor.evergreen_cpu
-        name: CPU
-        color: "#4caf50"
-      - entity: sensor.evergreen_ram
-        name: RAM
-        color: "#2196f3"
-      - entity: sensor.evergreen_disk
-        name: Disk
-        color: "#f44336"
-    positions:
-      indicator: "off"
+```text
+http://<IP-ADDRESS-OF-YOUR-BESZEL-HUB>:8090
 ```
 
-## Credits & License
+Example:
 
-- Original integration by Ronjar - [ronjar/beszel-ha](https://github.com/ronjar/beszel-ha)
-- Beszel monitoring software by [henrygd](https://github.com/henrygd/beszel)
-- This fork got extended with GitHub Copilot, Claude Sonnet 5 (Anthropic), and OpenAI Codex, maintained by [mojelumi0](https://github.com/mojelumi0)
+```text
+http://192.168.178.40:8090
+```
 
-Licensed under the MIT License — see [LICENSE](LICENSE)
+The address must be reachable from Home Assistant itself. Do not use `localhost` unless the Beszel Hub is running inside the same Home Assistant environment and is actually reachable there.
+
+The setup form asks for:
+
+| Field | Description |
+|---|---|
+| URL | Root URL of the Beszel Hub, without an API path |
+| Username | Beszel account email or username |
+| Password | Password for the Beszel account |
+| Update interval | Polling interval in seconds; default is `120` |
+| Verify SSL | Verify the HTTPS certificate; leave enabled for trusted certificates |
+
+> [!TIP]
+> Create a dedicated Beszel user for Home Assistant and give it access only to the systems you want to expose. The integration automatically adds every system visible to that account.
+
+## Available entities
+
+Each Beszel system becomes a Home Assistant device. Entity IDs are based on the system name in Beszel. A system called `homeserver`, for example, normally creates `sensor.homeserver_cpu`, `sensor.homeserver_ram`, and `binary_sensor.homeserver_status`.
+
+### Main sensors
+
+| Entity | Unit | Details |
+|---|---:|---|
+| CPU | `%` | Per-core usage and user/system/iowait/steal/idle breakdown are attributes |
+| RAM | `%` | Used, total, buffer/cache, and ZFS ARC values are attributes |
+| RAM Total | `GiB` | Total installed memory |
+| Disk | `%` | Used and total space are attributes |
+| Disk Total | `GiB` | Total size of the primary disk |
+| Bandwidth | `MiB/s` | Combined current network rate |
+| Network Receive | `KiB/s` | Current received data rate |
+| Network Send | `KiB/s` | Current sent data rate |
+| Uptime | `min` | System uptime |
+| Status | on/off | Connectivity binary sensor for the Beszel Agent |
+
+### Automatically discovered sensors
+
+These entities appear only when the Beszel Hub or Agent reports the corresponding data.
+
+| Entity | Unit | Details |
+|---|---:|---|
+| GPU | `%` | One per GPU, with VRAM and power attributes |
+| SWAP | `%` | Includes used and total swap attributes |
+| Temperature | `°C` | Main temperature with named temperature zones as attributes |
+| Additional disks | `%` / `GiB` | Usage and total size for additional mounted filesystems |
+| S.M.A.R.T. | problem/ok | Disk health, temperature, capacity, lifetime, and selected failure attributes |
+| Load Average 1m / 5m / 15m | — | Diagnostic sensors, disabled by default |
+| Failed Services | — | Number of failed systemd services |
+| Total Services | — | Diagnostic sensor, disabled by default |
+| Fan | `rpm` | One diagnostic sensor per fan reported by recent Linux Agents |
+| Battery | `%` | Existing primary battery plus additional named batteries |
+| Beszel Hub Update | — | Available when Hub update checks are enabled |
+
+Some diagnostics are disabled by default to keep the entity list and Home Assistant Recorder database manageable. You can enable them from the Beszel device page in **Settings → Devices & services → Entities**.
+
+Fan monitoring and multiple named batteries require a recent Beszel Hub and Agent. Older Agents continue to work with the metrics they support.
+
+## Native Home Assistant dashboard example
+
+This example uses only cards included with Home Assistant. It does not require Mushroom, Bar Card, Card Mod, or any other frontend extension.
+
+It includes:
+
+- CPU, RAM, and disk gauges with colored ranges
+- Status, uptime, temperature, traffic, and failed-service tiles
+- Optional load-average tiles
+- A 24-hour CPU, RAM, and disk history graph
+
+Before pasting the YAML, replace every occurrence of `homeserver` with the entity prefix created for your own Beszel system. Check **Developer tools → States** if you are unsure about an entity ID. Remove any optional tile whose entity does not exist on your system.
+
+To add it, edit a dashboard, select **Add card → Manual**, and paste:
+
+```yaml
+type: vertical-stack
+cards:
+  - type: heading
+    heading: Homeserver
+    heading_style: title
+    icon: mdi:server
+
+  - type: grid
+    columns: 3
+    square: false
+    cards:
+      - type: gauge
+        entity: sensor.homeserver_cpu
+        name: CPU
+        min: 0
+        max: 100
+        needle: true
+        segments:
+          - from: 0
+            color: var(--success-color)
+          - from: 70
+            color: var(--warning-color)
+          - from: 90
+            color: var(--error-color)
+
+      - type: gauge
+        entity: sensor.homeserver_ram
+        name: RAM
+        min: 0
+        max: 100
+        needle: true
+        segments:
+          - from: 0
+            color: var(--success-color)
+          - from: 75
+            color: var(--warning-color)
+          - from: 90
+            color: var(--error-color)
+
+      - type: gauge
+        entity: sensor.homeserver_disk
+        name: Disk
+        min: 0
+        max: 100
+        needle: true
+        segments:
+          - from: 0
+            color: var(--success-color)
+          - from: 75
+            color: var(--warning-color)
+          - from: 90
+            color: var(--error-color)
+
+  - type: heading
+    heading: System
+    heading_style: subtitle
+    icon: mdi:server-network
+
+  - type: grid
+    columns: 2
+    square: false
+    cards:
+      - type: tile
+        entity: binary_sensor.homeserver_status
+        name: Agent status
+        icon: mdi:server-network
+        color: green
+
+      - type: tile
+        entity: sensor.homeserver_uptime
+        name: Uptime
+        icon: mdi:clock-outline
+        color: blue
+
+      - type: tile
+        entity: sensor.homeserver_temperature
+        name: Temperature
+        icon: mdi:thermometer
+        color: orange
+
+      - type: tile
+        entity: sensor.homeserver_services_failed
+        name: Failed services
+        icon: mdi:alert-circle-outline
+        color: red
+
+      - type: tile
+        entity: sensor.homeserver_network_receive
+        name: Network receive
+        icon: mdi:download-network
+        color: green
+
+      - type: tile
+        entity: sensor.homeserver_network_send
+        name: Network send
+        icon: mdi:upload-network
+        color: blue
+
+  - type: heading
+    heading: Load average
+    heading_style: subtitle
+    icon: mdi:chart-line
+
+  - type: grid
+    columns: 3
+    square: false
+    cards:
+      - type: tile
+        entity: sensor.homeserver_load_average_1m
+        name: 1 minute
+        icon: mdi:numeric-1-circle-outline
+        color: green
+
+      - type: tile
+        entity: sensor.homeserver_load_average_5m
+        name: 5 minutes
+        icon: mdi:numeric-5-circle-outline
+        color: amber
+
+      - type: tile
+        entity: sensor.homeserver_load_average_15m
+        name: 15 minutes
+        icon: mdi:timer-sand
+        color: orange
+
+  - type: heading
+    heading: Last 24 hours
+    heading_style: subtitle
+    icon: mdi:chart-areaspline
+
+  - type: history-graph
+    hours_to_show: 24
+    entities:
+      - entity: sensor.homeserver_cpu
+        name: CPU
+      - entity: sensor.homeserver_ram
+        name: RAM
+      - entity: sensor.homeserver_disk
+        name: Disk
+```
+
+### Compact tile-only alternative
+
+For a smaller mobile dashboard, this version uses only native tile cards:
+
+```yaml
+type: grid
+columns: 2
+square: false
+cards:
+  - type: tile
+    entity: binary_sensor.homeserver_status
+    name: Status
+    icon: mdi:server-network
+    color: green
+  - type: tile
+    entity: sensor.homeserver_uptime
+    name: Uptime
+    icon: mdi:clock-outline
+    color: blue
+  - type: tile
+    entity: sensor.homeserver_cpu
+    name: CPU
+    icon: mdi:cpu-64-bit
+    color: green
+  - type: tile
+    entity: sensor.homeserver_ram
+    name: RAM
+    icon: mdi:memory
+    color: blue
+  - type: tile
+    entity: sensor.homeserver_disk
+    name: Disk
+    icon: mdi:harddisk
+    color: orange
+  - type: tile
+    entity: sensor.homeserver_temperature
+    name: Temperature
+    icon: mdi:thermometer
+    color: red
+```
+
+## Automations
+
+Because the integration exposes regular Home Assistant entities, you can use them in automations without any special service calls. Useful examples include:
+
+- Notify when `binary_sensor.homeserver_status` turns off
+- Alert when CPU, RAM, or disk usage stays above a threshold
+- Notify when `sensor.homeserver_services_failed` rises above `0`
+- Alert when a S.M.A.R.T. problem sensor turns on
+- Notify when a battery drops below a chosen percentage
+- Show a persistent notification when a Beszel Hub update is available
+
+## Troubleshooting
+
+### Home Assistant cannot connect
+
+- Open the Beszel URL from another device on the same network.
+- Confirm that Home Assistant can reach the Hub address and port.
+- For a standard local installation, include port `8090`.
+- Do not add `/api`, `/login`, or another path to the URL.
+- If you use HTTPS, verify that the certificate is valid for the hostname entered.
+
+### Authentication fails
+
+- Sign in to the Beszel web interface with the same account.
+- Make sure both username and password are present.
+- If the credentials changed, open the Home Assistant reauthentication notification and enter the new credentials.
+
+### A sensor is missing
+
+Optional entities are created only when Beszel reports the corresponding metric. Confirm that the Hub and Agent are current and that the value appears in Beszel itself. Reload the integration after adding new hardware such as a fan, battery, GPU, or disk.
+
+### A diagnostic entity is disabled
+
+Open **Settings → Devices & services → Entities**, search for the entity, and enable it. Load-average and total-service sensors are intentionally disabled by default.
+
+## Credits
+
+- Original Home Assistant integration by [Ronjar](https://github.com/Ronjar/beszel-ha)
+- Beszel by [henrygd](https://github.com/henrygd/beszel)
+- Additional feature and documentation inspiration from [inventor7777/improved-beszel-ha](https://github.com/inventor7777/improved-beszel-ha)
+- This fork is maintained by [mojelumi0](https://github.com/mojelumi0) with assistance from GitHub Copilot, Anthropic Claude, and OpenAI Codex
+
+## License
+
+Released under the [MIT License](LICENSE).
