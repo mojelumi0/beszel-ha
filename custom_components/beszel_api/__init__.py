@@ -76,7 +76,7 @@ async def async_setup_entry(hass, entry: ConfigEntry) -> bool:
 
             online_systems = [system for system in systems if _system_is_online(system)]
             stats_task = asyncio.gather(
-                *(_fetch_stats(system) for system in online_systems)
+                *(_fetch_stats(system) for system in systems)
             )
             smart_task = hass.async_add_executor_job(client.get_smart_devices)
             stats_results, all_smart = await asyncio.gather(stats_task, smart_task)
