@@ -36,6 +36,62 @@ def _system_is_online(system: Any) -> bool:
     return getattr(system, "status", None) == "up"
 
 
+async def _async_fetch_system_stats(
+    hass,
+    client: BeszelApiClient,
+    system: Any,
+) -> tuple[str, dict[str, Any]]:
+    """Fetch one system's statistics without failing unrelated systems."""
+    try:
+        stats = await hass.async_add_executor_job(
+            client.get_system_stats,
+            system.id,
+        )
+    except (BeszelInvalidAuth, BeszelCannotConnect):
+        raise
+    except Exception as err:  # noqa: BLE001
+        LOGGER.warning(
+            "Failed to fetch statistics for system %s: %s",
+            system.id,
+            err,
+            exc_info=True,
+        )
+        return system.id, {}
+
+    stats_data = getattr(stats, "stats", None) if stats else None
+    return system.id, stats_data if isinstance(stats_data, dict) else {}
+
+
+async def _async_fetch_all_system_stats(
+    hass,
+    client: BeszelApiClient,
+    systems: list[Any],
+) -> dict[str, dict[str, Any]]:
+    """Fetch statistics for all systems, including currently offline agents."""
+    results = await asyncio.gather(
+        *(
+            _async_fetch_system_stats(hass, client, system)
+            for system in systems
+        )
+    )
+    return dict(results)
+
+
+async def _async_fetch_smart_devices(hass, client: BeszelApiClient) -> list[Any]:
+    """Fetch optional S.M.A.R.T. data without breaking system monitoring."""
+    try:
+        return await hass.async_add_executor_job(client.get_smart_devices)
+    except (BeszelInvalidAuth, BeszelCannotConnect):
+        raise
+    except Exception as err:  # noqa: BLE001
+        LOGGER.warning(
+            "Failed to fetch S.M.A.R.T. devices: %s",
+            err,
+            exc_info=True,
+        )
+        return []
+
+
 async def async_setup_entry(hass, entry: ConfigEntry) -> bool:
     """Set up Beszel from a config entry."""
     hass.data.setdefault(DOMAIN, {})
@@ -66,23 +122,14 @@ async def async_setup_entry(hass, entry: ConfigEntry) -> bool:
             if not systems:
                 return {"systems": [], "stats": {}, "smart_devices": {}}
 
-            async def _fetch_stats(system: Any) -> tuple[str, dict[str, Any]]:
-                stats = await hass.async_add_executor_job(
-                    client.get_system_stats,
-                    system.id,
-                )
-                stats_data = getattr(stats, "stats", None) if stats else None
-                return system.id, stats_data if isinstance(stats_data, dict) else {}
-
             online_systems = [system for system in systems if _system_is_online(system)]
-            stats_task = asyncio.gather(
-                *(_fetch_stats(system) for system in systems)
+            stats_task = _async_fetch_all_system_stats(
+                hass,
+                client,
+                systems,
             )
-            smart_task = hass.async_add_executor_job(client.get_smart_devices)
-            stats_results, all_smart = await asyncio.gather(stats_task, smart_task)
-
-            stats_data = {system.id: {} for system in systems}
-            stats_data.update(dict(stats_results))
+            smart_task = _async_fetch_smart_devices(hass, client)
+            stats_data, all_smart = await asyncio.gather(stats_task, smart_task)
 
             smart_devices: dict[str, list[dict[str, Any]]] = {}
             for device in all_smart:
@@ -110,7 +157,7 @@ async def async_setup_entry(hass, entry: ConfigEntry) -> bool:
                 "Beszel update successful: systems=%d online=%d stats=%d smart=%d",
                 len(systems),
                 len(online_systems),
-                len(stats_results),
+                len(stats_data),
                 sum(len(devices) for devices in smart_devices.values()),
             )
             return {
