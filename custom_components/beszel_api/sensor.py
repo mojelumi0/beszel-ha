@@ -1,12 +1,20 @@
 from homeassistant.components.sensor import (
-    SensorEntity,
     SensorDeviceClass,
+    SensorEntity,
     SensorStateClass,
 )
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.const import (
+    PERCENTAGE,
+    UnitOfDataRate,
+    UnitOfInformation,
+    UnitOfTemperature,
+    UnitOfTime,
+)
 from homeassistant.helpers.icon import icon_for_battery_level
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN, LOGGER
+
 
 async def async_setup_entry(hass, entry, async_add_entities):
     data = hass.data[DOMAIN][entry.entry_id]
@@ -33,32 +41,37 @@ async def async_setup_entry(hass, entry, async_add_entities):
                 # Get stats for this system
                 system_stats = stats_data.get(system.id, {})
 
-                if system.info.get("dt") is not None:
+                system_info = getattr(system, "info", None) or {}
+                if system_info.get("dt") is not None:
                     entities.append(BeszelTemperatureSensor(coordinator, system))
 
                 if system_stats and 's' in system_stats:
                     entities.append(BeszelSWAPSensor(coordinator, system))
 
-                if system_stats and 'g' in system_stats:
-                    for gpu_key, gpu_data in system_stats['g'].items():
+                if system_stats and isinstance(system_stats.get('g'), dict):
+                    for gpu_key in system_stats['g']:
                         entities.append(BeszelGPUSensor(coordinator, system, gpu_key))
 
                 # Create EFS sensors if EFS data is available
                 if system_stats and 'efs' in system_stats and isinstance(system_stats['efs'], dict):
-                    for disk_name in system_stats['efs'].keys():
+                    for disk_name in system_stats['efs']:
                         entities.append(BeszelEFSDiskSensor(coordinator, system, disk_name))
                         entities.append(BeszelDiskTotalSensor(coordinator, system, disk_name))
-                        LOGGER.info(f"Created EFS sensors for {system.name} - {disk_name}")
+                        LOGGER.debug(
+                            "Created EFS sensors for %s - %s",
+                            system.name,
+                            disk_name,
+                        )
 
                 # Create battery sensor if data is available
                 if system_stats and 'bat' in system_stats and isinstance(system_stats['bat'], list):
                     entities.append(BeszelBatterySensor(coordinator, system))
 
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 LOGGER.error(f"Failed to create sensors for system {system.name if hasattr(system, 'name') else 'unknown'}: {e}")
                 continue
 
-        LOGGER.info(f"Created {len(entities)} sensors total")
+        LOGGER.debug("Created %d sensors total", len(entities))
         async_add_entities(entities)
     except Exception as e:
         LOGGER.error(f"Failed to setup sensors: {e}")
@@ -92,6 +105,21 @@ class BeszelBaseSensor(CoordinatorEntity, SensorEntity):
         return self.coordinator.data.get('stats', {}).get(self._system_id, {})
 
     @property
+    def system_info(self):
+        """Return the current system info payload as a dictionary."""
+        info = getattr(self.system, "info", None) if self.system else None
+        return info if isinstance(info, dict) else {}
+
+    @property
+    def available(self):
+        """Only expose measurements while both Hub and agent are online."""
+        return (
+            self.coordinator.last_update_success
+            and self.system is not None
+            and getattr(self.system, "status", None) == "up"
+        )
+
+    @property
     def device_info(self):
         sys = self.system
         if sys is None:
@@ -121,11 +149,11 @@ class BeszelCPUSensor(BeszelBaseSensor):
 
     @property
     def native_value(self):
-        return self.system.info.get("cpu") if self.system else None
+        return self.system_info.get("cpu")
 
     @property
     def native_unit_of_measurement(self):
-        return "%"
+        return PERCENTAGE
 
     @property
     def state_class(self):
@@ -158,18 +186,18 @@ class BeszelGPUSensor(BeszelBaseSensor):
     
     @property
     def available(self):
-        if not self.coordinator.last_update_success:
+        if not super().available:
             return False
         gpu_usage = self.gpu_data.get("u") if self.gpu_data else None
         return gpu_usage is not None
 
     @property
     def native_value(self):
-        return self.gpu_data.get("u") if self.system else None
+        return self.gpu_data.get("u")
 
     @property
     def native_unit_of_measurement(self):
-        return "%"
+        return PERCENTAGE
 
     @property
     def state_class(self):
@@ -207,11 +235,11 @@ class BeszelRAMSensor(BeszelBaseSensor):
 
     @property
     def native_value(self):
-        return self.system.info.get("mp") if self.system else None
+        return self.system_info.get("mp")
 
     @property
     def native_unit_of_measurement(self):
-        return "%"
+        return PERCENTAGE
 
     @property
     def state_class(self):
@@ -222,8 +250,13 @@ class BeszelRAMSensor(BeszelBaseSensor):
         """Total and Used RAM in GB"""
 
         attributes = {}
-        attributes['ram_used_gb'] = self.stats_data.get("mu")
-        attributes['ram_total_gb'] = self.stats_data.get("m")
+        ram_used = self.stats_data.get("mu")
+        ram_total = self.stats_data.get("m")
+        attributes['ram_used_gib'] = ram_used
+        attributes['ram_total_gib'] = ram_total
+        # Backward-compatible aliases retained for the 1.2.x release line.
+        attributes['ram_used_gb'] = ram_used
+        attributes['ram_total_gb'] = ram_total
 
         return attributes
 
@@ -242,7 +275,7 @@ class BeszelSWAPSensor(BeszelBaseSensor):
     
     @property
     def available(self):
-        if not self.coordinator.last_update_success:
+        if not super().available:
             return False
         swap_total = self.stats_data.get("s")
         return swap_total is not None and swap_total > 0
@@ -257,7 +290,7 @@ class BeszelSWAPSensor(BeszelBaseSensor):
 
     @property
     def native_unit_of_measurement(self):
-        return "%"
+        return PERCENTAGE
     
     @property
     def suggested_display_precision(self):
@@ -272,8 +305,12 @@ class BeszelSWAPSensor(BeszelBaseSensor):
         """Total and Used SWAP in GB"""
 
         attributes = {}
-        attributes['swap_used_gb'] = self.stats_data.get("su", 0)
-        attributes['swap_total_gb'] = self.stats_data.get("s")
+        swap_used = self.stats_data.get("su", 0)
+        swap_total = self.stats_data.get("s")
+        attributes['swap_used_gib'] = swap_used
+        attributes['swap_total_gib'] = swap_total
+        attributes['swap_used_gb'] = swap_used
+        attributes['swap_total_gb'] = swap_total
 
         return attributes
 
@@ -294,11 +331,11 @@ class BeszelDiskSensor(BeszelBaseSensor):
 
     @property
     def native_value(self):
-        return self.system.info.get("dp") if self.system else None
+        return self.system_info.get("dp")
 
     @property
     def native_unit_of_measurement(self):
-        return "%"
+        return PERCENTAGE
 
     @property
     def state_class(self):
@@ -309,8 +346,12 @@ class BeszelDiskSensor(BeszelBaseSensor):
         """Total and Used DISK in GB"""
 
         attributes = {}
-        attributes['disk_used_gb'] = self.stats_data.get("du")
-        attributes['disk_total_gb'] = self.stats_data.get("d")
+        disk_used = self.stats_data.get("du")
+        disk_total = self.stats_data.get("d")
+        attributes['disk_used_gib'] = disk_used
+        attributes['disk_total_gib'] = disk_total
+        attributes['disk_used_gb'] = disk_used
+        attributes['disk_total_gb'] = disk_total
 
         return attributes
 
@@ -330,15 +371,15 @@ class BeszelBandwidthSensor(BeszelBaseSensor):
     
     @property
     def available(self):
-        if not self.coordinator.last_update_success:
+        if not super().available:
             return False
-        bandwidth = self.system.info.get("bb") if self.system else None
+        bandwidth = self.system_info.get("bb")
         return bandwidth is not None
 
     @property
     def native_value(self):
-        bandwidth = self.system.info.get("bb") if self.system else None
-        return bandwidth / 1024000 if bandwidth is not None else None
+        bandwidth = self.system_info.get("bb")
+        return bandwidth / (1024**2) if bandwidth is not None else None
 
     @property
     def device_class(self):
@@ -346,7 +387,7 @@ class BeszelBandwidthSensor(BeszelBaseSensor):
 
     @property
     def native_unit_of_measurement(self):
-        return "MB/s"
+        return UnitOfDataRate.MEBIBYTES_PER_SECOND
 
     @property
     def state_class(self):
@@ -354,7 +395,7 @@ class BeszelBandwidthSensor(BeszelBaseSensor):
     
     @property
     def suggested_display_precision(self):
-        return 8
+        return 3
 
 
 class BeszelNetworkReceiveSensor(BeszelBaseSensor):
@@ -373,7 +414,10 @@ class BeszelNetworkReceiveSensor(BeszelBaseSensor):
     @property
     def native_value(self):
         b_data = self.stats_data.get("b")
-        return b_data[1] / 1024 if self.system and b_data else None
+        if not isinstance(b_data, (list, tuple)) or len(b_data) < 2:
+            return None
+        received = b_data[1]
+        return received / 1024 if isinstance(received, (int, float)) else None
 
     @property
     def device_class(self):
@@ -381,7 +425,7 @@ class BeszelNetworkReceiveSensor(BeszelBaseSensor):
 
     @property
     def native_unit_of_measurement(self):
-        return "kB/s"
+        return UnitOfDataRate.KIBIBYTES_PER_SECOND
 
     @property
     def state_class(self):
@@ -407,7 +451,10 @@ class BeszelNetworkSendSensor(BeszelBaseSensor):
     @property
     def native_value(self):
         b_data = self.stats_data.get("b")
-        return b_data[0] / 1024 if self.system and b_data else None
+        if not isinstance(b_data, (list, tuple)) or len(b_data) < 2:
+            return None
+        sent = b_data[0]
+        return sent / 1024 if isinstance(sent, (int, float)) else None
 
     @property
     def device_class(self):
@@ -415,7 +462,7 @@ class BeszelNetworkSendSensor(BeszelBaseSensor):
 
     @property
     def native_unit_of_measurement(self):
-        return "kB/s"
+        return UnitOfDataRate.KIBIBYTES_PER_SECOND
 
     @property
     def state_class(self):
@@ -436,14 +483,14 @@ class BeszelTemperatureSensor(BeszelBaseSensor):
     
     @property
     def available(self):
-        if not self.coordinator.last_update_success:
+        if not super().available:
             return False
-        temperature = self.system.info.get("dt") if self.system else None
+        temperature = self.system_info.get("dt")
         return temperature is not None
 
     @property
     def native_value(self):
-        return self.system.info.get("dt") if self.system else None
+        return self.system_info.get("dt")
 
     @property
     def device_class(self):
@@ -451,7 +498,7 @@ class BeszelTemperatureSensor(BeszelBaseSensor):
 
     @property
     def native_unit_of_measurement(self):
-        return "°C"
+        return UnitOfTemperature.CELSIUS
 
     @property
     def state_class(self):
@@ -490,7 +537,7 @@ class BeszelUptimeSensor(BeszelBaseSensor):
     def native_value(self):
         if not self.system:
             return None
-        uptime_seconds = self.system.info.get("u")
+        uptime_seconds = self.system_info.get("u")
         return uptime_seconds / 60 if uptime_seconds is not None else None
 
     @property
@@ -503,7 +550,7 @@ class BeszelUptimeSensor(BeszelBaseSensor):
 
     @property
     def native_unit_of_measurement(self):
-        return "min"
+        return UnitOfTime.MINUTES
 
 class BeszelEFSDiskSensor(BeszelBaseSensor):
     def __init__(self, coordinator, system, disk_name):
@@ -534,13 +581,13 @@ class BeszelEFSDiskSensor(BeszelBaseSensor):
         used_space = disk_data.get('du')
 
         # Calculate disk usage percentage
-        if total_space and used_space and total_space > 0:
+        if total_space is not None and used_space is not None and total_space > 0:
             return (used_space / total_space) * 100
         return None
 
     @property
     def native_unit_of_measurement(self):
-        return "%"
+        return PERCENTAGE
     
     @property
     def suggested_display_precision(self):
@@ -559,16 +606,33 @@ class BeszelEFSDiskSensor(BeszelBaseSensor):
         efs_data = self.stats_data.get('efs', {})
         disk_data = efs_data.get(self._disk_name, {})
 
-        return {
-            "total_disk_space_gb": disk_data.get('d'),
-            "disk_used_gb": disk_data.get('du'),
+        attributes = {
+            "total_disk_space_gib": disk_data.get('d'),
+            "disk_used_gib": disk_data.get('du'),
             "read_mb_s": disk_data.get('r'),
             "write_mb_s": disk_data.get('w'),
         }
-
+        attributes["total_disk_space_gb"] = attributes["total_disk_space_gib"]
+        attributes["disk_used_gb"] = attributes["disk_used_gib"]
+        return attributes
 
 
 class BeszelBatterySensor(BeszelBaseSensor):
+    @property
+    def battery_data(self):
+        """Return a validated (level, state) battery tuple."""
+        battery = self.stats_data.get("bat") if self.stats_data else None
+        if not isinstance(battery, (list, tuple)) or len(battery) < 2:
+            return None
+        level, state = battery[0], battery[1]
+        if not isinstance(level, (int, float)):
+            return None
+        return level, state
+
+    @property
+    def available(self):
+        return super().available and self.battery_data is not None
+
     @property
     def unique_id(self):
         return f"beszel_{self._system_id}_battery"
@@ -579,10 +643,10 @@ class BeszelBatterySensor(BeszelBaseSensor):
 
     @property
     def icon(self):
-        bat = self.stats_data.get("bat") if self.stats_data else None
-        if not bat:
+        battery = self.battery_data
+        if battery is None:
             return "mdi:battery-unknown"
-        level, state = bat
+        level, state = battery
         # https://github.com/henrygd/beszel/blob/4d05bfdff0ec90b68e820ad5dc32a5c4bccf8f0f/internal/site/src/lib/enums.ts#L41-L48
         charging = state == 3
 
@@ -598,14 +662,12 @@ class BeszelBatterySensor(BeszelBaseSensor):
 
     @property
     def native_value(self):
-        bat = self.stats_data.get("bat") if self.stats_data else None
-        if not bat:
-            return None
-        return bat[0]
+        battery = self.battery_data
+        return battery[0] if battery is not None else None
 
     @property
     def native_unit_of_measurement(self):
-        return "%"
+        return PERCENTAGE
 
 
 class BeszelRAMTotalSensor(BeszelBaseSensor):
@@ -633,7 +695,7 @@ class BeszelRAMTotalSensor(BeszelBaseSensor):
 
     @property
     def native_unit_of_measurement(self):
-        return "GB"
+        return UnitOfInformation.GIBIBYTES
 
     @property
     def state_class(self):
@@ -678,7 +740,7 @@ class BeszelDiskTotalSensor(BeszelBaseSensor):
 
     @property
     def native_unit_of_measurement(self):
-        return "GB"
+        return UnitOfInformation.GIBIBYTES
 
     @property
     def state_class(self):
