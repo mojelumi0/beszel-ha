@@ -14,6 +14,7 @@ from custom_components.beszel_api.binary_sensor import (
 from custom_components.beszel_api.sensor import (
     BeszelBandwidthSensor,
     BeszelBatterySensor,
+    BeszelCPUSensor,
     BeszelEFSDiskSensor,
     BeszelNetworkReceiveSensor,
     BeszelRAMTotalSensor,
@@ -71,6 +72,58 @@ def test_hub_offline_marks_status_unavailable() -> None:
 
     assert BeszelStatusBinarySensor(coordinator, system).available is False
     assert BeszelBandwidthSensor(coordinator, system).available is False
+
+
+def test_cpu_core_usage_is_exposed_as_attributes() -> None:
+    """Per-core usage should be available on the existing CPU entity."""
+    system = _system()
+    coordinator = _coordinator(system, stats={"cpus": [12, 34, 0, 100]})
+
+    sensor = BeszelCPUSensor(coordinator, system)
+
+    assert sensor.extra_state_attributes == {
+        "cpu_core_count": 4,
+        "cpu_core_0": 12,
+        "cpu_core_1": 34,
+        "cpu_core_2": 0,
+        "cpu_core_3": 100,
+    }
+
+
+def test_missing_or_invalid_cpu_core_data_is_safe() -> None:
+    """Missing and malformed per-core payloads must not raise errors."""
+    system = _system()
+
+    for stats in ({}, {"cpus": None}, {"cpus": "invalid"}, {"cpus": []}):
+        sensor = BeszelCPUSensor(_coordinator(system, stats=stats), system)
+        assert sensor.extra_state_attributes == {}
+
+
+def test_cpu_core_attributes_are_hidden_while_agent_is_offline() -> None:
+    """Stale per-core measurements must not remain visible while offline."""
+    system = _system(status="down")
+    coordinator = _coordinator(system, stats={"cpus": [12, 34]})
+
+    sensor = BeszelCPUSensor(coordinator, system)
+
+    assert sensor.extra_state_attributes == {}
+
+
+def test_invalid_individual_cpu_core_values_are_skipped() -> None:
+    """Only numeric per-core values should become Home Assistant attributes."""
+    system = _system()
+    coordinator = _coordinator(
+        system,
+        stats={"cpus": [10, "invalid", False, 40.5]},
+    )
+
+    sensor = BeszelCPUSensor(coordinator, system)
+
+    assert sensor.extra_state_attributes == {
+        "cpu_core_count": 4,
+        "cpu_core_0": 10,
+        "cpu_core_3": 40.5,
+    }
 
 
 def test_efs_zero_percent_is_a_valid_value() -> None:
