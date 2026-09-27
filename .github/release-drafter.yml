@@ -1,13 +1,16 @@
 name-template: '$RESOLVED_VERSION'
 tag-template: '$RESOLVED_VERSION'
 categories:
+  - type: pre-exclude
+    when:
+      label: 'skip-changelog'
   - title: '🚀 Features'
     semver-increment: minor
     when:
-      labels: ['enhancement', 'feature']
+      labels: ['enhancement']
   - title: '🐛 Bug Fixes'
     when:
-      labels: ['bug', 'fix']
+      labels: ['bug']
   - title: '🔒 Security'
     when:
       labels: ['security']

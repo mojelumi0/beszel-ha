@@ -21,11 +21,14 @@ Beszel already collects useful information about your servers. This integration 
 
 - Local polling directly from your Beszel Hub
 - Automatic discovery of every system visible to the configured Beszel user
+- Runtime discovery of new systems, disks, GPUs, fans, batteries, ZFS pools,
+  and S.M.A.R.T. devices without reloading the integration
 - Configurable polling interval from 10 to 3600 seconds
 - Native Home Assistant device classes, state classes, and units
 - Automatic reauthentication and Home Assistant reauth flow
 - Parallel system-stat requests for faster updates with multiple systems
-- Optional S.M.A.R.T., load-average, fan, battery, and systemd diagnostics
+- Optional S.M.A.R.T., ZFS, load-average, fan, battery, and systemd diagnostics
+- Beszel 0.20 disk I/O, per-interface network, and extended GPU details
 - Beszel Hub update entity when update checks are enabled in Beszel
 
 ## Installation
@@ -113,10 +116,11 @@ These entities appear only when the Beszel Hub or Agent reports the correspondin
 
 | Entity | Unit | Details |
 |---|---:|---|
-| GPU | `%` | One per GPU, with VRAM and power attributes |
+| GPU | `%` | One per GPU, with VRAM, power, package power, and engine usage attributes |
 | SWAP | `%` | Includes used and total swap attributes |
 | Temperature | `°C` | Main temperature with named temperature zones as attributes |
-| Additional disks | `%` / `GiB` | Usage and total size for additional mounted filesystems |
+| Additional disks | `%` / `GiB` | Usage, total size, and supported I/O details for additional mounted filesystems |
+| ZFS pool | `%` | One diagnostic usage sensor plus a problem binary sensor per pool, with health, capacity, and I/O attributes |
 | S.M.A.R.T. | problem/ok | Disk health, temperature, capacity, lifetime, and selected failure attributes |
 | Load Average 1m / 5m / 15m | — | Diagnostic sensors, disabled by default |
 | Failed Services | — | Number of failed systemd services |
@@ -127,7 +131,14 @@ These entities appear only when the Beszel Hub or Agent reports the correspondin
 
 Some diagnostics are disabled by default to keep the entity list and Home Assistant Recorder database manageable. You can enable them from the Beszel device page in **Settings → Devices & services → Entities**.
 
-Fan monitoring and multiple named batteries require a recent Beszel Hub and Agent. Older Agents continue to work with the metrics they support.
+Fan monitoring, multiple named batteries, and the newest I/O and GPU details
+require a recent Beszel Hub and Agent. ZFS pool metrics require Beszel 0.19 or
+newer. Older Agents continue to work with the metrics they support.
+
+The main disk entity also exposes supported read/write rates, cumulative I/O,
+latency, and utilization values as attributes. Network receive and send
+entities expose a compact `interfaces` attribute with per-interface rates and
+cumulative traffic, so these details do not create dozens of extra entities.
 
 ## Native Home Assistant dashboard example
 
@@ -356,7 +367,12 @@ Because the integration exposes regular Home Assistant entities, you can use the
 
 ### A sensor is missing
 
-Optional entities are created only when Beszel reports the corresponding metric. Confirm that the Hub and Agent are current and that the value appears in Beszel itself. Reload the integration after adding new hardware such as a fan, battery, GPU, or disk.
+Optional entities are created only when Beszel reports the corresponding
+metric. Confirm that the Hub and Agent are current and that the value appears
+in Beszel itself. Newly reported systems and optional metrics are discovered
+after a successful coordinator update; an integration reload is normally not
+required. Reload once as a troubleshooting step if an entity still does not
+appear.
 
 ### A diagnostic entity is disabled
 
