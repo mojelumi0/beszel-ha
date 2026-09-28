@@ -91,10 +91,11 @@ should normally select the Enhancement category below for the release notes.
 - [ ] Enhancement or new feature — `enhancement`
 - [ ] Bug fix — `bug`
 - [ ] Documentation only — `documentation`
+- [ ] Security fix — `security`
 - [ ] Dependency update — `dependencies`
 - [ ] GitHub Actions or CI maintenance — `github_actions`
 - [ ] Release preparation or version-only change — `version_bump`
-- [ ] No release note needed / maintainer decision required
+- [ ] No release note needed — `skip-changelog`
 
 ## Final checklist
 

@@ -7,40 +7,107 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import DOMAIN, LOGGER, SMART_CURATED_ATTRIBUTES
 
 
+def _build_system_binary_sensors(
+    coordinator,
+    system,
+    smart_devices_data,
+    stats_data,
+):
+    """Build status, S.M.A.R.T., and ZFS health entities for one system."""
+    entities = [BeszelStatusBinarySensor(coordinator, system)]
+    system_smart_devices = smart_devices_data.get(system.id, [])
+    if isinstance(system_smart_devices, (list, tuple)):
+        for device in system_smart_devices:
+            if not isinstance(device, dict) or not device.get("id"):
+                continue
+            entities.append(BeszelSmartBinarySensor(coordinator, system, device))
+
+    system_stats = stats_data.get(system.id, {})
+    if not isinstance(system_stats, dict):
+        return entities
+    zfs_pools = system_stats.get("z")
+    if not isinstance(zfs_pools, dict):
+        return entities
+    for pool_name, pool_data in zfs_pools.items():
+        if (
+            isinstance(pool_name, str)
+            and isinstance(pool_data, dict)
+            and isinstance(pool_data.get("h"), str)
+            and pool_data["h"]
+        ):
+            entities.append(
+                BeszelZFSHealthBinarySensor(coordinator, system, pool_name)
+            )
+    return entities
+
+
 async def async_setup_entry(hass, entry, async_add_entities):
+    """Set up binary sensors and discover later S.M.A.R.T. devices."""
     data = hass.data[DOMAIN][entry.entry_id]
     coordinator = data["coordinator"]
-    entities = []
+    known_unique_ids = set()
 
-    try:
-        # Get systems from coordinator data
-        systems = coordinator.data['systems']
-        smart_devices_data = coordinator.data.get('smart_devices', {})
+    def discover_entities():
+        coordinator_data = coordinator.data
+        if not isinstance(coordinator_data, dict):
+            return []
 
+        systems = coordinator_data.get("systems", [])
+        smart_devices_data = coordinator_data.get("smart_devices", {})
+        stats_data = coordinator_data.get("stats", {})
+        if not isinstance(systems, (list, tuple)):
+            return []
+        if not isinstance(smart_devices_data, dict):
+            smart_devices_data = {}
+        if not isinstance(stats_data, dict):
+            stats_data = {}
+
+        new_entities = []
         for system in systems:
+            if not getattr(system, "id", None):
+                continue
             try:
-                # Add system status sensor
-                entities.append(BeszelStatusBinarySensor(coordinator, system))
-                
-                # Create S.M.A.R.T. sensors for each disk
-                system_smart_devices = smart_devices_data.get(system.id, [])
-                for device in system_smart_devices:
-                    entities.append(BeszelSmartBinarySensor(coordinator, system, device))
-                    LOGGER.debug(
-                        "Created S.M.A.R.T. sensor for %s - %s",
-                        system.name,
-                        device.get("name", "unknown"),
-                    )
-
-            except Exception as e:  # noqa: BLE001
-                LOGGER.error(f"Failed to create binary sensors for system {system.name if hasattr(system, 'name') else 'unknown'}: {e}")
+                candidates = _build_system_binary_sensors(
+                    coordinator,
+                    system,
+                    smart_devices_data,
+                    stats_data,
+                )
+            except Exception as err:  # noqa: BLE001
+                LOGGER.warning(
+                    "Failed to discover binary sensors for system %s: %s",
+                    getattr(system, "name", "unknown"),
+                    err,
+                    exc_info=True,
+                )
                 continue
 
-        LOGGER.debug("Created %d binary sensors total", len(entities))
-        async_add_entities(entities)
-    except Exception as e:
-        LOGGER.error(f"Failed to setup binary sensors: {e}")
-        raise
+            for entity in candidates:
+                unique_id = entity.unique_id
+                if unique_id in known_unique_ids:
+                    continue
+                known_unique_ids.add(unique_id)
+                new_entities.append(entity)
+
+        return new_entities
+
+    initial_entities = discover_entities()
+    LOGGER.debug("Created %d binary sensors total", len(initial_entities))
+    async_add_entities(initial_entities)
+
+    def discover_new_entities():
+        new_entities = discover_entities()
+        if new_entities:
+            LOGGER.debug(
+                "Discovered %d new Beszel binary sensors",
+                len(new_entities),
+            )
+            async_add_entities(new_entities)
+
+    remove_listener = coordinator.async_add_listener(discover_new_entities)
+    async_on_unload = getattr(entry, "async_on_unload", None)
+    if callable(async_on_unload):
+        async_on_unload(remove_listener)
 
 
 class BeszelBaseBinarySensor(CoordinatorEntity, BinarySensorEntity):
@@ -51,9 +118,14 @@ class BeszelBaseBinarySensor(CoordinatorEntity, BinarySensorEntity):
 
     @property
     def system(self):
-        systems = self.coordinator.data['systems']
+        coordinator_data = self.coordinator.data
+        if not isinstance(coordinator_data, dict):
+            return None
+        systems = coordinator_data.get("systems", [])
+        if not isinstance(systems, (list, tuple)):
+            return None
         for s in systems:
-            if s.id == self._system_id:
+            if getattr(s, "id", None) == self._system_id:
                 return s
         return None
 
@@ -67,7 +139,8 @@ class BeszelBaseBinarySensor(CoordinatorEntity, BinarySensorEntity):
         sys = self.system
         if sys is None:
             return None
-        info = getattr(sys, "info", None) or {}
+        raw_info = getattr(sys, "info", None)
+        info = raw_info if isinstance(raw_info, dict) else {}
         return {
             "identifiers": {(DOMAIN, sys.id)},
             "name": sys.name,
@@ -96,24 +169,107 @@ class BeszelStatusBinarySensor(BeszelBaseBinarySensor):
         return BinarySensorDeviceClass.CONNECTIVITY
 
 
+class BeszelZFSHealthBinarySensor(BeszelBaseBinarySensor):
+    """Report whether a ZFS pool is in a non-ONLINE health state."""
+
+    def __init__(self, coordinator, system, pool_name):
+        super().__init__(coordinator, system)
+        self._pool_name = pool_name
+
+    @property
+    def pool_data(self):
+        coordinator_data = self.coordinator.data
+        if not isinstance(coordinator_data, dict):
+            return {}
+        stats_data = coordinator_data.get("stats", {})
+        if not isinstance(stats_data, dict):
+            return {}
+        system_stats = stats_data.get(self._system_id, {})
+        if not isinstance(system_stats, dict):
+            return {}
+        pools = system_stats.get("z")
+        if not isinstance(pools, dict):
+            return {}
+        pool_data = pools.get(self._pool_name)
+        return pool_data if isinstance(pool_data, dict) else {}
+
+    @property
+    def health(self):
+        health = self.pool_data.get("h")
+        return health if isinstance(health, str) and health else None
+
+    @property
+    def unique_id(self):
+        return f"beszel_{self._system_id}_zfs_pool_{self._pool_name}_health"
+
+    @property
+    def name(self):
+        if not self.system:
+            return None
+        display_name = self.pool_data.get("n")
+        pool_label = (
+            display_name
+            if isinstance(display_name, str) and display_name
+            else self._pool_name
+        )
+        return f"{self.system.name} ZFS {pool_label} Health"
+
+    @property
+    def available(self):
+        return (
+            super().available
+            and getattr(self.system, "status", None) == "up"
+            and self.health is not None
+        )
+
+    @property
+    def is_on(self):
+        health = self.health
+        return health.upper() != "ONLINE" if health is not None else None
+
+    @property
+    def device_class(self):
+        return BinarySensorDeviceClass.PROBLEM
+
+    @property
+    def icon(self):
+        return "mdi:database-alert" if self.is_on else "mdi:database-check"
+
+    @property
+    def extra_state_attributes(self):
+        return (
+            {"health_state": self.health}
+            if self.available and self.health is not None
+            else {}
+        )
+
+
 class BeszelSmartBinarySensor(BeszelBaseBinarySensor):
     """Binary sensor for disk S.M.A.R.T. status with all data in attributes"""
     
     def __init__(self, coordinator, system, device_data):
         super().__init__(coordinator, system)
-        self._device_id = device_data.get('id', '')
-        self._device_name = device_data.get('name', '')  # e.g., /dev/sda
+        self._device_id = device_data.get("id", "")
+        device_name = device_data.get("name", "")
+        self._device_name = device_name if isinstance(device_name, str) else ""
         
         # Create clean disk name for entity ID (remove /dev/ prefix)
-        self._disk_name = self._device_name.replace('/dev/', '')
+        self._disk_name = self._device_name.replace("/dev/", "") or "Disk"
 
     @property
     def _smart_device_data(self):
         """Get current S.M.A.R.T. data for this device from coordinator"""
-        smart_devices = self.coordinator.data.get('smart_devices', {})
+        coordinator_data = self.coordinator.data
+        if not isinstance(coordinator_data, dict):
+            return {}
+        smart_devices = coordinator_data.get("smart_devices", {})
+        if not isinstance(smart_devices, dict):
+            return {}
         system_devices = smart_devices.get(self._system_id, [])
+        if not isinstance(system_devices, (list, tuple)):
+            return {}
         for device in system_devices:
-            if device.get('id') == self._device_id:
+            if isinstance(device, dict) and device.get("id") == self._device_id:
                 return device
         return {}
 
@@ -134,6 +290,8 @@ class BeszelSmartBinarySensor(BeszelBaseBinarySensor):
     def name(self):
         device_data = self._smart_device_data
         model = device_data.get('model', self._disk_name)
+        if not isinstance(model, str):
+            model = self._disk_name
         # Use short model name if available
         if model:
             # Take first part of model name
@@ -236,7 +394,12 @@ class BeszelSmartBinarySensor(BeszelBaseBinarySensor):
         # CRC errors, etc.) plus a list of attribute names Beszel has flagged
         # as failing, so this stays useful without needing new entities.
         failed_attributes = []
-        for raw_attr in device_data.get('attributes') or []:
+        raw_attributes = device_data.get("attributes")
+        if not isinstance(raw_attributes, (list, tuple)):
+            raw_attributes = []
+        for raw_attr in raw_attributes:
+            if not isinstance(raw_attr, dict):
+                continue
             name = raw_attr.get('n')
             if not name:
                 continue
