@@ -814,6 +814,9 @@ class BeszelDiskSensor(BeszelBaseSensor):
     def extra_state_attributes(self):
         """Total and Used DISK in GB"""
 
+        if not self.available:
+            return {}
+
         attributes = {}
         disk_used = self.stats_data.get("du")
         disk_total = self.stats_data.get("d")
@@ -869,12 +872,12 @@ class BeszelBandwidthSensor(BeszelBaseSensor):
         if not super().available:
             return False
         bandwidth = self.system_info.get("bb")
-        return bandwidth is not None
+        return _is_number(bandwidth)
 
     @property
     def native_value(self):
         bandwidth = self.system_info.get("bb")
-        return bandwidth / (1024**2) if bandwidth is not None else None
+        return bandwidth / (1024**2) if _is_number(bandwidth) else None
 
     @property
     def device_class(self):
@@ -1118,7 +1121,7 @@ class BeszelEFSDiskSensor(BeszelBaseSensor):
     @property
     def extra_state_attributes(self):
         """Return additional state attributes for the EFS disk."""
-        if not self.stats_data:
+        if not self.available or not self.stats_data:
             return {}
 
         efs_data = self.stats_data.get('efs', {})

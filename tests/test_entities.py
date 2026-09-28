@@ -91,6 +91,37 @@ def test_agent_offline_keeps_only_connectivity_status_available() -> None:
     assert smart_status.available is False
 
 
+def test_agent_offline_hides_stale_disk_diagnostics() -> None:
+    """Root and additional disk attributes must disappear while offline."""
+    system = _system(status="down")
+    coordinator = _coordinator(
+        system,
+        stats={
+            "d": 100,
+            "du": 25,
+            "dio": [1024**2, 2 * 1024**2],
+            "efs": {
+                "data": {
+                    "d": 50,
+                    "du": 10,
+                    "rb": 1024**2,
+                    "wb": 2 * 1024**2,
+                }
+            },
+        },
+    )
+
+    assert BeszelDiskSensor(coordinator, system).extra_state_attributes == {}
+    assert (
+        BeszelEFSDiskSensor(
+            coordinator,
+            system,
+            "data",
+        ).extra_state_attributes
+        == {}
+    )
+
+
 def test_hub_offline_marks_status_unavailable() -> None:
     """Connectivity status itself is unavailable when the Hub update failed."""
     system = _system()
@@ -358,7 +389,9 @@ def test_malformed_optional_metric_maps_are_safe() -> None:
 
 def test_malformed_optional_numeric_values_are_safe() -> None:
     """Unexpected scalar types must not raise from existing entities."""
-    system = _system(info={"dt": "invalid", "u": "invalid"})
+    system = _system(
+        info={"bb": "invalid", "dt": "invalid", "u": "invalid"}
+    )
     coordinator = _coordinator(
         system,
         stats={
@@ -374,6 +407,9 @@ def test_malformed_optional_numeric_values_are_safe() -> None:
     assert BeszelEFSDiskSensor(coordinator, system, "data").native_value is None
     assert BeszelGPUSensor(coordinator, system, "gpu-1").available is False
     assert BeszelTemperatureSensor(coordinator, system).available is False
+    bandwidth = BeszelBandwidthSensor(coordinator, system)
+    assert bandwidth.available is False
+    assert bandwidth.native_value is None
 
 
 def test_malformed_smart_attributes_are_ignored() -> None:
