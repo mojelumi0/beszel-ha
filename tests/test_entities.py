@@ -346,6 +346,10 @@ def test_zfs_health_binary_sensor_reports_pool_problems() -> None:
     assert sensor.is_on is True
     assert sensor.extra_state_attributes == {"health_state": "DEGRADED"}
 
+    system.status = "down"
+    assert sensor.available is False
+    assert sensor.extra_state_attributes == {}
+
 
 def test_named_battery_sensor_supports_multiple_batteries() -> None:
     """Each entry in Beszel's multi-battery payload should be addressable."""

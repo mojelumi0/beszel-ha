@@ -237,7 +237,11 @@ class BeszelZFSHealthBinarySensor(BeszelBaseBinarySensor):
 
     @property
     def extra_state_attributes(self):
-        return {"health_state": self.health} if self.health is not None else {}
+        return (
+            {"health_state": self.health}
+            if self.available and self.health is not None
+            else {}
+        )
 
 
 class BeszelSmartBinarySensor(BeszelBaseBinarySensor):
