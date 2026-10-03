@@ -115,6 +115,125 @@ def test_revoked_token_reauthenticates_and_retries_once() -> None:
     assert systems.get_full_list.call_count == 2
 
 
+def test_empty_system_list_reauthenticates_revoked_session() -> None:
+    """A silent PocketBase list-rule rejection must trigger reauthentication."""
+    pocketbase, users, systems = _mock_pocketbase()
+    users.auth_with_password.side_effect = _successful_auth(pocketbase)
+    users.auth_refresh.side_effect = ClientResponseError("revoked", status=401)
+    systems.get_full_list.side_effect = [
+        [SimpleNamespace(id="system-1")],
+        [],
+        [SimpleNamespace(id="system-1")],
+    ]
+
+    with patch.object(api, "PocketBase", return_value=pocketbase):
+        client = BeszelApiClient("https://beszel.example", "user", "password")
+        assert client.get_systems()[0].id == "system-1"
+        assert client.get_systems()[0].id == "system-1"
+
+    users.auth_refresh.assert_called_once_with()
+    assert users.auth_with_password.call_count == 2
+    assert systems.get_full_list.call_count == 3
+
+
+def test_valid_empty_system_list_is_not_repeatedly_refreshed() -> None:
+    """Removing all assigned systems must remain a valid empty result."""
+    pocketbase, users, systems = _mock_pocketbase()
+    users.auth_with_password.side_effect = _successful_auth(pocketbase)
+    systems.get_full_list.side_effect = [
+        [SimpleNamespace(id="system-1")],
+        [],
+        [],
+    ]
+
+    with patch.object(api, "PocketBase", return_value=pocketbase):
+        client = BeszelApiClient("https://beszel.example", "user", "password")
+        assert client.get_systems()[0].id == "system-1"
+        assert client.get_systems() == []
+        assert client.get_systems() == []
+
+    users.auth_refresh.assert_called_once_with()
+    users.auth_with_password.assert_called_once_with("user", "password")
+    assert systems.get_full_list.call_count == 3
+
+
+def test_empty_system_list_after_reauth_does_not_loop() -> None:
+    """A valid empty result after reauthentication must stop further retries."""
+    pocketbase, users, systems = _mock_pocketbase()
+    users.auth_with_password.side_effect = _successful_auth(pocketbase)
+    users.auth_refresh.side_effect = ClientResponseError("revoked", status=401)
+    systems.get_full_list.side_effect = [
+        [SimpleNamespace(id="system-1")],
+        [],
+        [],
+        [],
+    ]
+
+    with patch.object(api, "PocketBase", return_value=pocketbase):
+        client = BeszelApiClient("https://beszel.example", "user", "password")
+        assert client.get_systems()[0].id == "system-1"
+        assert client.get_systems() == []
+        assert client.get_systems() == []
+
+    users.auth_refresh.assert_called_once_with()
+    assert users.auth_with_password.call_count == 2
+    assert systems.get_full_list.call_count == 4
+
+
+def test_empty_system_auth_refresh_connection_error_is_classified() -> None:
+    """A failed session check must not masquerade as a valid empty account."""
+    pocketbase, users, systems = _mock_pocketbase()
+    users.auth_with_password.side_effect = _successful_auth(pocketbase)
+    users.auth_refresh.side_effect = ClientResponseError(
+        "transport failed",
+        original_error=httpx.ConnectError("offline"),
+    )
+    systems.get_full_list.side_effect = [
+        [SimpleNamespace(id="system-1")],
+        [],
+    ]
+
+    with patch.object(api, "PocketBase", return_value=pocketbase):
+        client = BeszelApiClient("https://beszel.example", "user", "password")
+        assert client.get_systems()[0].id == "system-1"
+        with pytest.raises(BeszelCannotConnect):
+            client.get_systems()
+
+    users.auth_refresh.assert_called_once_with()
+    users.auth_with_password.assert_called_once_with("user", "password")
+
+
+def test_empty_system_reauth_rejects_invalid_credentials() -> None:
+    """Rejected replacement credentials must start Home Assistant reauth."""
+    pocketbase, users, systems = _mock_pocketbase()
+    auth_calls = 0
+
+    def authenticate(*_args, **_kwargs):
+        nonlocal auth_calls
+        auth_calls += 1
+        if auth_calls == 1:
+            pocketbase.auth_store.token = "valid-token"
+            pocketbase.auth_store.is_valid = True
+            return
+        raise ClientResponseError("bad login", status=400)
+
+    users.auth_with_password.side_effect = authenticate
+    users.auth_refresh.side_effect = ClientResponseError("revoked", status=401)
+    systems.get_full_list.side_effect = [
+        [SimpleNamespace(id="system-1")],
+        [],
+    ]
+
+    with patch.object(api, "PocketBase", return_value=pocketbase):
+        client = BeszelApiClient("https://beszel.example", "user", "password")
+        assert client.get_systems()[0].id == "system-1"
+        with pytest.raises(BeszelInvalidAuth):
+            client.get_systems()
+
+    users.auth_refresh.assert_called_once_with()
+    assert users.auth_with_password.call_count == 2
+
+
 def test_system_filter_uses_pocketbase_escaping() -> None:
     """System IDs must go through PocketBase's parameterized filter builder."""
     pocketbase, users, stats_service = _mock_pocketbase()
