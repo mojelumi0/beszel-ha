@@ -12,6 +12,7 @@ from pocketbase.errors import ClientResponseError
 from pocketbase.models import Record
 
 _AUTH_ERROR_STATUSES = {401, 403}
+_AUTH_REFRESH_ERROR_STATUSES = {400, 401, 403}
 _TRANSIENT_ERROR_STATUSES = {408, 429}
 _T = TypeVar("_T")
 
@@ -44,6 +45,8 @@ class BeszelApiClient:
         self._verify_ssl = verify_ssl
         self._client: PocketBase | None = None
         self._auth_lock = RLock()
+        self._systems_lock = RLock()
+        self._had_systems = False
 
     def _raise_api_error(
         self,
@@ -114,11 +117,23 @@ class BeszelApiClient:
         request: Callable[[PocketBase], _T],
     ) -> _T:
         """Run a request and retry it once after an authentication rejection."""
+        result, _client, _token_used = self._request_with_auth_context(
+            operation,
+            request,
+        )
+        return result
+
+    def _request_with_auth_context(
+        self,
+        operation: str,
+        request: Callable[[PocketBase], _T],
+    ) -> tuple[_T, PocketBase, str]:
+        """Run a request and return the client and token used for the response."""
         client = self._ensure_client()
         token_used = client.auth_store.token
 
         try:
-            return request(client)
+            return request(client), client, token_used
         except ClientResponseError as err:
             if err.status not in _AUTH_ERROR_STATUSES:
                 self._raise_api_error(err, operation)
@@ -131,8 +146,9 @@ class BeszelApiClient:
                     client.auth_store.clear()
 
             client = self._ensure_client()
+            token_used = client.auth_store.token
             try:
-                return request(client)
+                return request(client), client, token_used
             except Exception as retry_err:  # noqa: BLE001
                 self._raise_api_error(retry_err, operation)
         except Exception as err:  # noqa: BLE001
@@ -140,12 +156,101 @@ class BeszelApiClient:
 
         raise BeszelApiError(f"Unable to {operation}")  # pragma: no cover
 
+    def _validate_empty_system_response(
+        self,
+        client: PocketBase,
+        token_used: str,
+    ) -> bool:
+        """Validate a suspicious empty system list.
+
+        PocketBase list rules return an empty successful response when the
+        request no longer satisfies the rule, including when a token was
+        revoked server-side. Return whether callers must repeat the list
+        request after another worker refreshed the token or this method
+        reauthenticated the client.
+        """
+        with self._auth_lock:
+            if self._client is not client or client.auth_store.token != token_used:
+                return True
+
+            try:
+                client.collection("users").auth_refresh()
+            except ClientResponseError as err:
+                if err.status not in _AUTH_REFRESH_ERROR_STATUSES:
+                    self._raise_api_error(err, "refresh Beszel authentication")
+
+                if client.auth_store.token == token_used:
+                    client.auth_store.clear()
+                self._authenticate(client)
+                return True
+            except Exception as err:  # noqa: BLE001
+                self._raise_api_error(err, "refresh Beszel authentication")
+
+            if not client.auth_store.is_valid:
+                client.auth_store.clear()
+                self._authenticate(client)
+                return True
+
+            return False
+
+    def _retry_systems_with_stable_auth_context(
+        self,
+        request: Callable[[PocketBase], list[Record]],
+    ) -> list[Record]:
+        """Retry systems without committing an empty result from a stale token.
+
+        The caller holds ``_auth_lock``. The explicit context check also guards
+        against unexpected auth-store mutations that bypass that lock.
+        """
+        for _attempt in range(2):
+            systems, client, token_used = self._request_with_auth_context(
+                "fetch systems from Beszel",
+                request,
+            )
+            if systems or (
+                self._client is client and client.auth_store.token == token_used
+            ):
+                return systems
+
+        raise BeszelApiError(
+            "Beszel authentication changed repeatedly while fetching systems"
+        )
+
     def get_systems(self) -> list[Record]:
         """Return all systems visible to the configured Beszel user."""
-        return self._request(
+        with self._systems_lock:
+            return self._get_systems()
+
+    def _get_systems(self) -> list[Record]:
+        """Return systems while preventing concurrent state updates."""
+
+        def _get_systems(client: PocketBase) -> list[Record]:
+            return client.collection("systems").get_full_list()
+
+        systems, client, token_used = self._request_with_auth_context(
             "fetch systems from Beszel",
-            lambda client: client.collection("systems").get_full_list(),
+            _get_systems,
         )
+
+        with self._auth_lock:
+            validate_session = self._had_systems and not systems
+            if systems:
+                self._had_systems = True
+                return systems
+            if not validate_session:
+                return systems
+
+            retry_required = self._validate_empty_system_response(
+                client,
+                token_used,
+            )
+            if retry_required:
+                # Keep authentication stable until the replacement response is
+                # received so another worker cannot make that response stale.
+                systems = self._retry_systems_with_stable_auth_context(_get_systems)
+
+            self._had_systems = bool(systems)
+        return systems
 
     def get_system_stats(self, system_id: str) -> Record | None:
         """Return the latest statistics record for a system."""
@@ -194,6 +299,7 @@ class BeszelApiClient:
         with self._auth_lock:
             client = self._client
             self._client = None
+            self._had_systems = False
             if client is None:
                 return
             client.auth_store.clear()
