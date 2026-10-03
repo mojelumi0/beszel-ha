@@ -193,6 +193,29 @@ class BeszelApiClient:
 
             return False
 
+    def _retry_systems_with_stable_auth_context(
+        self,
+        request: Callable[[PocketBase], list[Record]],
+    ) -> list[Record]:
+        """Retry systems without committing an empty result from a stale token.
+
+        The caller holds ``_auth_lock``. The explicit context check also guards
+        against unexpected auth-store mutations that bypass that lock.
+        """
+        for _attempt in range(2):
+            systems, client, token_used = self._request_with_auth_context(
+                "fetch systems from Beszel",
+                request,
+            )
+            if systems or (
+                self._client is client and client.auth_store.token == token_used
+            ):
+                return systems
+
+        raise BeszelApiError(
+            "Beszel authentication changed repeatedly while fetching systems"
+        )
+
     def get_systems(self) -> list[Record]:
         """Return all systems visible to the configured Beszel user."""
         with self._systems_lock:
@@ -224,7 +247,7 @@ class BeszelApiClient:
             if retry_required:
                 # Keep authentication stable until the replacement response is
                 # received so another worker cannot make that response stale.
-                systems = self._request("fetch systems from Beszel", _get_systems)
+                systems = self._retry_systems_with_stable_auth_context(_get_systems)
 
             self._had_systems = bool(systems)
         return systems

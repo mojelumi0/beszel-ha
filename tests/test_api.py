@@ -169,13 +169,47 @@ def test_empty_system_list_retries_after_concurrent_token_refresh() -> None:
     assert systems.get_full_list.call_count == 3
 
 
-def test_concurrent_system_requests_cannot_overwrite_newer_state() -> None:
-    """An older empty response must not overwrite a newer non-empty result."""
+def test_replacement_empty_response_retries_after_token_change() -> None:
+    """A replacement response from a changed token must also be retried."""
+    pocketbase, users, systems = _mock_pocketbase()
+    users.auth_with_password.side_effect = _successful_auth(pocketbase)
+    users.auth_refresh.side_effect = ClientResponseError("revoked", status=401)
+    request_count = 0
+
+    def get_full_list():
+        nonlocal request_count
+        request_count += 1
+        if request_count == 1:
+            return [SimpleNamespace(id="system-1")]
+        if request_count == 2:
+            return []
+        if request_count == 3:
+            pocketbase.auth_store.token = "unexpected-replacement-token"
+            pocketbase.auth_store.is_valid = True
+            return []
+        return [SimpleNamespace(id="system-1")]
+
+    systems.get_full_list.side_effect = get_full_list
+
+    with patch.object(api, "PocketBase", return_value=pocketbase):
+        client = BeszelApiClient("https://beszel.example", "user", "password")
+        assert client.get_systems()[0].id == "system-1"
+        assert client.get_systems()[0].id == "system-1"
+
+    users.auth_refresh.assert_called_once_with()
+    assert users.auth_with_password.call_count == 2
+    assert systems.get_full_list.call_count == 4
+
+
+def test_concurrent_system_requests_are_serialized() -> None:
+    """Concurrent system calls must be serialized before accessing state."""
     pocketbase, users, systems = _mock_pocketbase()
     users.auth_with_password.side_effect = _successful_auth(pocketbase)
     response_lock = Lock()
     first_empty_request_started = Event()
-    newer_request_finished = Event()
+    release_first_empty_request = Event()
+    newer_call_started = Event()
+    newer_request_started = Event()
     request_count = 0
 
     def get_full_list():
@@ -188,8 +222,9 @@ def test_concurrent_system_requests_cannot_overwrite_newer_state() -> None:
             return [SimpleNamespace(id="system-1")]
         if current_request == 2:
             first_empty_request_started.set()
-            newer_request_finished.wait(timeout=0.2)
+            release_first_empty_request.wait(timeout=1)
             return []
+        newer_request_started.set()
         return [SimpleNamespace(id="system-1")]
 
     systems.get_full_list.side_effect = get_full_list
@@ -205,19 +240,24 @@ def test_concurrent_system_requests_cannot_overwrite_newer_state() -> None:
             older_result.extend(client.get_systems())
 
         def fetch_newer_non_empty_response() -> None:
+            newer_call_started.set()
             newer_result.extend(client.get_systems())
-            newer_request_finished.set()
 
         older_thread = Thread(target=fetch_older_empty_response)
         newer_thread = Thread(target=fetch_newer_non_empty_response)
         older_thread.start()
         assert first_empty_request_started.wait(timeout=1)
         newer_thread.start()
+        assert newer_call_started.wait(timeout=1)
+        request_overlapped = newer_request_started.wait(timeout=0.1)
+        release_first_empty_request.set()
         older_thread.join(timeout=2)
         newer_thread.join(timeout=2)
 
     assert not older_thread.is_alive()
     assert not newer_thread.is_alive()
+    assert request_overlapped is False
+    assert newer_request_started.is_set()
     assert older_result == []
     assert newer_result[0].id == "system-1"
     assert client._had_systems is True
