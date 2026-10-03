@@ -136,6 +136,38 @@ def test_empty_system_list_reauthenticates_revoked_session() -> None:
     assert systems.get_full_list.call_count == 3
 
 
+def test_empty_system_list_retries_after_concurrent_token_refresh() -> None:
+    """An empty response from a superseded token must not be accepted."""
+    pocketbase, users, systems = _mock_pocketbase()
+    users.auth_with_password.side_effect = _successful_auth(pocketbase)
+
+    responses = iter(
+        (
+            [SimpleNamespace(id="system-1")],
+            [],
+            [SimpleNamespace(id="system-1")],
+        )
+    )
+
+    def get_full_list():
+        response = next(responses)
+        if response == []:
+            pocketbase.auth_store.token = "concurrently-refreshed-token"
+            pocketbase.auth_store.is_valid = True
+        return response
+
+    systems.get_full_list.side_effect = get_full_list
+
+    with patch.object(api, "PocketBase", return_value=pocketbase):
+        client = BeszelApiClient("https://beszel.example", "user", "password")
+        assert client.get_systems()[0].id == "system-1"
+        assert client.get_systems()[0].id == "system-1"
+
+    users.auth_refresh.assert_not_called()
+    users.auth_with_password.assert_called_once_with("user", "password")
+    assert systems.get_full_list.call_count == 3
+
+
 def test_valid_empty_system_list_is_not_repeatedly_refreshed() -> None:
     """Removing all assigned systems must remain a valid empty result."""
     pocketbase, users, systems = _mock_pocketbase()

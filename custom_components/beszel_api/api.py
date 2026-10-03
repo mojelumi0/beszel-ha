@@ -116,11 +116,23 @@ class BeszelApiClient:
         request: Callable[[PocketBase], _T],
     ) -> _T:
         """Run a request and retry it once after an authentication rejection."""
+        result, _client, _token_used = self._request_with_auth_context(
+            operation,
+            request,
+        )
+        return result
+
+    def _request_with_auth_context(
+        self,
+        operation: str,
+        request: Callable[[PocketBase], _T],
+    ) -> tuple[_T, PocketBase, str]:
+        """Run a request and return the client and token used for the response."""
         client = self._ensure_client()
         token_used = client.auth_store.token
 
         try:
-            return request(client)
+            return request(client), client, token_used
         except ClientResponseError as err:
             if err.status not in _AUTH_ERROR_STATUSES:
                 self._raise_api_error(err, operation)
@@ -133,8 +145,9 @@ class BeszelApiClient:
                     client.auth_store.clear()
 
             client = self._ensure_client()
+            token_used = client.auth_store.token
             try:
-                return request(client)
+                return request(client), client, token_used
             except Exception as retry_err:  # noqa: BLE001
                 self._raise_api_error(retry_err, operation)
         except Exception as err:  # noqa: BLE001
@@ -185,7 +198,10 @@ class BeszelApiClient:
         def _get_systems(client: PocketBase) -> list[Record]:
             return client.collection("systems").get_full_list()
 
-        systems = self._request("fetch systems from Beszel", _get_systems)
+        systems, client, token_used = self._request_with_auth_context(
+            "fetch systems from Beszel",
+            _get_systems,
+        )
 
         with self._auth_lock:
             validate_session = self._had_systems and not systems
@@ -195,15 +211,16 @@ class BeszelApiClient:
             if not validate_session:
                 return systems
 
-        client = self._ensure_client()
-        retry_required = self._validate_empty_system_response(
-            client,
-            client.auth_store.token,
-        )
-        if retry_required:
-            systems = self._request("fetch systems from Beszel", _get_systems)
-
         with self._auth_lock:
+            retry_required = self._validate_empty_system_response(
+                client,
+                token_used,
+            )
+            if retry_required:
+                # Keep authentication stable until the replacement response is
+                # received so another worker cannot make that response stale.
+                systems = self._request("fetch systems from Beszel", _get_systems)
+
             self._had_systems = bool(systems)
         return systems
 
