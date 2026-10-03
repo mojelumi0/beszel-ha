@@ -45,6 +45,7 @@ class BeszelApiClient:
         self._verify_ssl = verify_ssl
         self._client: PocketBase | None = None
         self._auth_lock = RLock()
+        self._systems_lock = RLock()
         self._had_systems = False
 
     def _raise_api_error(
@@ -194,6 +195,11 @@ class BeszelApiClient:
 
     def get_systems(self) -> list[Record]:
         """Return all systems visible to the configured Beszel user."""
+        with self._systems_lock:
+            return self._get_systems()
+
+    def _get_systems(self) -> list[Record]:
+        """Return systems while preventing concurrent state updates."""
 
         def _get_systems(client: PocketBase) -> list[Record]:
             return client.collection("systems").get_full_list()
@@ -211,7 +217,6 @@ class BeszelApiClient:
             if not validate_session:
                 return systems
 
-        with self._auth_lock:
             retry_required = self._validate_empty_system_response(
                 client,
                 token_used,

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 from pathlib import Path
+from threading import Event, Lock, Thread
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -165,6 +166,61 @@ def test_empty_system_list_retries_after_concurrent_token_refresh() -> None:
 
     users.auth_refresh.assert_not_called()
     users.auth_with_password.assert_called_once_with("user", "password")
+    assert systems.get_full_list.call_count == 3
+
+
+def test_concurrent_system_requests_cannot_overwrite_newer_state() -> None:
+    """An older empty response must not overwrite a newer non-empty result."""
+    pocketbase, users, systems = _mock_pocketbase()
+    users.auth_with_password.side_effect = _successful_auth(pocketbase)
+    response_lock = Lock()
+    first_empty_request_started = Event()
+    newer_request_finished = Event()
+    request_count = 0
+
+    def get_full_list():
+        nonlocal request_count
+        with response_lock:
+            request_count += 1
+            current_request = request_count
+
+        if current_request == 1:
+            return [SimpleNamespace(id="system-1")]
+        if current_request == 2:
+            first_empty_request_started.set()
+            newer_request_finished.wait(timeout=0.2)
+            return []
+        return [SimpleNamespace(id="system-1")]
+
+    systems.get_full_list.side_effect = get_full_list
+
+    with patch.object(api, "PocketBase", return_value=pocketbase):
+        client = BeszelApiClient("https://beszel.example", "user", "password")
+        assert client.get_systems()[0].id == "system-1"
+
+        older_result: list[SimpleNamespace] = []
+        newer_result: list[SimpleNamespace] = []
+
+        def fetch_older_empty_response() -> None:
+            older_result.extend(client.get_systems())
+
+        def fetch_newer_non_empty_response() -> None:
+            newer_result.extend(client.get_systems())
+            newer_request_finished.set()
+
+        older_thread = Thread(target=fetch_older_empty_response)
+        newer_thread = Thread(target=fetch_newer_non_empty_response)
+        older_thread.start()
+        assert first_empty_request_started.wait(timeout=1)
+        newer_thread.start()
+        older_thread.join(timeout=2)
+        newer_thread.join(timeout=2)
+
+    assert not older_thread.is_alive()
+    assert not newer_thread.is_alive()
+    assert older_result == []
+    assert newer_result[0].id == "system-1"
+    assert client._had_systems is True
     assert systems.get_full_list.call_count == 3
 
 
