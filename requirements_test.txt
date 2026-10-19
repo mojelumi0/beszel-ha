@@ -1,4 +1,4 @@
 # Tracks Home Assistant 2026.9 on its supported Python runtime.
-pytest-homeassistant-custom-component==0.13.367
+pytest-homeassistant-custom-component==0.13.372
 pocketbase==0.17.3
-ruff==0.16.9
+ruff==0.17.1
