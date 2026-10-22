@@ -1,3 +1,5 @@
+from math import isfinite
+
 from homeassistant.components.sensor import (
     SensorDeviceClass,
     SensorEntity,
@@ -6,6 +8,7 @@ from homeassistant.components.sensor import (
 from homeassistant.const import (
     PERCENTAGE,
     REVOLUTIONS_PER_MINUTE,
+    SIGNAL_STRENGTH_DECIBELS_MILLIWATT,
     EntityCategory,
     UnitOfDataRate,
     UnitOfInformation,
@@ -30,6 +33,50 @@ def _is_numeric_sequence(value, minimum_length=1):
         and len(value) >= minimum_length
         and all(_is_number(item) for item in value[:minimum_length])
     )
+
+
+def _memory_gib(stats_data, field, index, legacy_key, default=None):
+    """Prefer Beszel 0.21.1 byte values, retaining legacy GiB fields."""
+    values = stats_data.get(field)
+    if isinstance(values, (list, tuple)) and len(values) > index:
+        value = values[index]
+        if _is_number(value) and isfinite(value) and value >= 0:
+            return value / (1024**3)
+
+    value = stats_data.get(legacy_key, default)
+    if _is_number(value) and isfinite(value) and value >= 0:
+        return value
+    return None
+
+
+def _swap_gib(stats_data):
+    """Select one valid total/used pair, preferring bytes over legacy GiB."""
+    for values, divisor in (
+        (stats_data.get("swap"), 1024**3),
+        ((stats_data.get("s"), stats_data.get("su", 0)), 1),
+    ):
+        if not _is_numeric_sequence(values, 2):
+            continue
+        total, used = values[:2]
+        if isfinite(total) and isfinite(used) and 0 <= used <= total:
+            return total / divisor, used / divisor
+    return None
+
+
+def _wifi_interface_details(system_info):
+    """Return current interfaces with native RSSI; never use historical stats."""
+    interfaces = system_info.get("wf")
+    if not isinstance(interfaces, dict):
+        return {}
+    return {
+        name: reading
+        for name, reading in interfaces.items()
+        if isinstance(name, str)
+        and name
+        and isinstance(reading, dict)
+        and _is_number(reading.get("r"))
+        and isfinite(reading["r"])
+    }
 
 
 def _network_interface_details(stats_data, rate_index, total_index):
@@ -74,8 +121,13 @@ def _build_system_sensors(coordinator, system, stats_data):
     if _is_number(system_info.get("dt")):
         entities.append(BeszelTemperatureSensor(coordinator, system))
 
-    if _is_number(system_stats.get("s")):
+    if _swap_gib(system_stats) is not None:
         entities.append(BeszelSWAPSensor(coordinator, system))
+
+    for interface_name in sorted(_wifi_interface_details(system_info)):
+        entities.append(
+            BeszelWiFiSignalSensor(coordinator, system, interface_name)
+        )
 
     load_average = system_stats.get("la")
     if not _is_numeric_sequence(load_average, 3):
@@ -343,9 +395,12 @@ class BeszelCPUSensor(BeszelBaseSensor):
 
         breakdown = self.stats_data.get("cpub")
         if _is_numeric_sequence(breakdown, 5):
-            labels = ("user", "system", "iowait", "steal", "idle")
+            labels = (
+                "user", "system", "iowait", "steal", "idle", "irq", "softirq", "nice"
+            )
             for label, usage in zip(labels, breakdown, strict=False):
-                attributes[f"cpu_{label}_percent"] = usage
+                if _is_number(usage) and isfinite(usage):
+                    attributes[f"cpu_{label}_percent"] = usage
 
         return attributes
 
@@ -708,22 +763,22 @@ class BeszelRAMSensor(BeszelBaseSensor):
 
     @property
     def extra_state_attributes(self):
-        """Total and Used RAM in GB"""
+        """Total and used RAM in GiB, with the established attribute names."""
 
         attributes = {}
-        ram_used = self.stats_data.get("mu")
-        ram_total = self.stats_data.get("m")
+        ram_used = _memory_gib(self.stats_data, "mem", 1, "mu")
+        ram_total = _memory_gib(self.stats_data, "mem", 0, "m")
         attributes['ram_used_gib'] = ram_used
         attributes['ram_total_gib'] = ram_total
         # Backward-compatible aliases retained for the 1.2.x release line.
         attributes['ram_used_gb'] = ram_used
         attributes['ram_total_gb'] = ram_total
 
-        ram_buffer_cache = self.stats_data.get("mb")
+        ram_buffer_cache = _memory_gib(self.stats_data, "mem", 2, "mb")
         if _is_number(ram_buffer_cache):
             attributes["ram_buffer_cache_gib"] = ram_buffer_cache
 
-        ram_zfs_arc = self.stats_data.get("mz")
+        ram_zfs_arc = _memory_gib(self.stats_data, "mem", 3, "mz")
         if _is_number(ram_zfs_arc):
             attributes["ram_zfs_arc_gib"] = ram_zfs_arc
 
@@ -746,15 +801,14 @@ class BeszelSWAPSensor(BeszelBaseSensor):
     def available(self):
         if not super().available:
             return False
-        swap_total = self.stats_data.get("s")
-        return _is_number(swap_total) and swap_total > 0
+        swap = _swap_gib(self.stats_data)
+        return swap is not None and swap[0] > 0
 
     @property
     def native_value(self):
-        swap_used = self.stats_data.get("su", 0)
-        swap_total = self.stats_data.get("s")
-        if self.available and _is_number(swap_used):
-            return (swap_used / swap_total * 100)
+        if self.available:
+            swap_total, swap_used = _swap_gib(self.stats_data)
+            return swap_used / swap_total * 100
         return None
 
     @property
@@ -771,11 +825,11 @@ class BeszelSWAPSensor(BeszelBaseSensor):
 
     @property
     def extra_state_attributes(self):
-        """Total and Used SWAP in GB"""
+        """Total and used swap in GiB, retaining the legacy aliases."""
 
         attributes = {}
-        swap_used = self.stats_data.get("su", 0)
-        swap_total = self.stats_data.get("s")
+        swap = _swap_gib(self.stats_data)
+        swap_total, swap_used = swap if swap is not None else (None, None)
         attributes['swap_used_gib'] = swap_used
         attributes['swap_total_gib'] = swap_total
         attributes['swap_used_gb'] = swap_used
@@ -894,6 +948,62 @@ class BeszelBandwidthSensor(BeszelBaseSensor):
     @property
     def suggested_display_precision(self):
         return 3
+
+
+class BeszelWiFiSignalSensor(BeszelBaseSensor):
+    """Current Wi-Fi signal for one stable OS interface identity."""
+
+    def __init__(self, coordinator, system, interface_name):
+        super().__init__(coordinator, system)
+        self._interface_name = interface_name
+
+    @property
+    def wifi_data(self):
+        return _wifi_interface_details(self.system_info).get(self._interface_name, {})
+
+    @property
+    def unique_id(self):
+        return f"beszel_{self._system_id}_wifi_signal_{self._interface_name}"
+
+    @property
+    def name(self):
+        if not self.system:
+            return None
+        return f"{self.system.name} Wi-Fi Signal {self._interface_name}"
+
+    @property
+    def available(self):
+        return super().available and self.wifi_data.get("r") is not None
+
+    @property
+    def native_value(self):
+        return self.wifi_data.get("r") if self.available else None
+
+    @property
+    def device_class(self):
+        return SensorDeviceClass.SIGNAL_STRENGTH
+
+    @property
+    def native_unit_of_measurement(self):
+        return SIGNAL_STRENGTH_DECIBELS_MILLIWATT
+
+    @property
+    def state_class(self):
+        return SensorStateClass.MEASUREMENT
+
+    @property
+    def entity_category(self):
+        return EntityCategory.DIAGNOSTIC
+
+    @property
+    def extra_state_attributes(self):
+        if not self.available:
+            return {}
+        attributes = {"interface": self._interface_name}
+        ssid = self.wifi_data.get("s")
+        if isinstance(ssid, str) and ssid:
+            attributes["ssid"] = ssid
+        return attributes
 
 
 class BeszelNetworkReceiveSensor(BeszelBaseSensor):
@@ -1291,9 +1401,7 @@ class BeszelRAMTotalSensor(BeszelBaseSensor):
 
     @property
     def native_value(self):
-        if not self.stats_data:
-            return None
-        return self.stats_data.get("m")
+        return _memory_gib(self.stats_data, "mem", 0, "m")
 
     @property
     def device_class(self):
