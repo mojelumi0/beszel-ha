@@ -22,13 +22,15 @@ Beszel already collects useful information about your servers. This integration 
 - Local polling directly from your Beszel Hub
 - Automatic discovery of every system visible to the configured Beszel user
 - Runtime discovery of new systems, disks, GPUs, fans, batteries, ZFS pools,
-  and S.M.A.R.T. devices without reloading the integration
+  Wi-Fi interfaces, and S.M.A.R.T. devices without reloading the integration
 - Configurable polling interval from 10 to 3600 seconds
 - Native Home Assistant device classes, state classes, and units
 - Automatic reauthentication and Home Assistant reauth flow
 - Parallel system-stat requests for faster updates with multiple systems
 - Optional S.M.A.R.T., ZFS, load-average, fan, battery, and systemd diagnostics
 - Beszel 0.20 disk I/O, per-interface network, and extended GPU details
+- Beszel 0.21.1 memory byte fields and extended CPU breakdown, with support
+  for older Hub and Agent payloads
 - Beszel Hub update entity when update checks are enabled in Beszel
 
 ## Installation
@@ -99,7 +101,7 @@ Each Beszel system becomes a Home Assistant device. Entity IDs are based on the 
 
 | Entity | Unit | Details |
 |---|---:|---|
-| CPU | `%` | Per-core usage and user/system/iowait/steal/idle breakdown are attributes |
+| CPU | `%` | Per-core usage and user/system/iowait/steal/idle/IRQ/SoftIRQ/Nice breakdown are attributes |
 | RAM | `%` | Used, total, buffer/cache, and ZFS ARC values are attributes |
 | RAM Total | `GiB` | Total installed memory |
 | Disk | `%` | Used and total space are attributes |
@@ -126,6 +128,7 @@ These entities appear only when the Beszel Hub or Agent reports the correspondin
 | Failed Services | — | Number of failed systemd services |
 | Total Services | — | Diagnostic sensor, disabled by default |
 | Fan | `rpm` | One diagnostic sensor per fan reported by recent Linux Agents |
+| Wi-Fi Signal | `dBm` | One diagnostic sensor per interface with a current native signal reading; SSID is an attribute when reported |
 | Battery | `%` | Existing primary battery plus additional named batteries |
 | Beszel Hub Update | — | Available when Hub update checks are enabled |
 
@@ -139,6 +142,45 @@ The main disk entity also exposes supported read/write rates, cumulative I/O,
 latency, and utilization values as attributes. Network receive and send
 entities expose a compact `interfaces` attribute with per-interface rates and
 cumulative traffic, so these details do not create dozens of extra entities.
+
+### Beszel 0.21.1 compatibility
+
+RAM details and RAM Total prefer the `mem` byte array (total, used,
+buffer/cache, ZFS ARC). SWAP prefers the `swap` byte array (total, used).
+Byte values are converted to GiB without rounding. Older `m`/`mu`/`mb`/`mz`
+fields remain fallbacks for individual RAM values. Swap total and used values
+are validated together: both must be finite, non-negative numbers and used
+must not exceed total. An incomplete or invalid `swap` pair falls back to the
+complete legacy `s`/`su` pair; values from the two formats are never mixed.
+Only an omitted legacy `su` defaults to zero. If neither pair is valid, an
+existing swap sensor becomes unavailable and its size attributes are unknown.
+The RAM percentage still uses Beszel's reported percentage. Existing entity
+IDs, `*_gib` attributes, and legacy `*_gb` attribute aliases are retained.
+Zero used swap remains a valid `0 %` measurement.
+
+The existing CPU sensor also exposes `cpu_irq_percent`,
+`cpu_softirq_percent`, and `cpu_nice_percent` when reported. Older five-value
+CPU breakdowns and per-core attributes continue to work.
+
+### Wi-Fi signal monitoring
+
+Wi-Fi telemetry requires Beszel 0.21 or newer and an Agent that reports native
+RSSI. A system named `homeserver` reporting interface `wlan0` normally creates
+`sensor.homeserver_wi_fi_signal_wlan0`. The diagnostic entity reports dBm and
+includes `interface` and, when available, `ssid` attributes. Its identity uses
+the OS interface identity, so changing the SSID does not create a new entity.
+
+Only current readings in `system.info.wf` create Wi-Fi entities. An interface
+without a numeric, finite signal reading creates no entity; signal quality
+percentages are never converted to dBm. Interfaces appearing later are
+discovered automatically on a subsequent coordinator update.
+
+If an interface disconnects or stops reporting a signal, its existing entity
+remains registered and becomes **unavailable**. Its current value and SSID
+attributes are cleared until a new reading arrives. Historical `stats.wf`
+values never substitute for a missing current reading. A Hub or Agent outage
+also makes the signal unavailable. Existing entities recover automatically
+when current readings return, preserving dashboards and history.
 
 ## Native Home Assistant dashboard example
 
