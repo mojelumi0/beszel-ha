@@ -15,6 +15,7 @@ from homeassistant.const import (
     UnitOfTemperature,
     UnitOfTime,
 )
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.icon import icon_for_battery_level
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -338,20 +339,20 @@ class BeszelBaseSensor(CoordinatorEntity, SensorEntity):
         )
 
     @property
-    def device_info(self):
+    def device_info(self) -> DeviceInfo | None:
         sys = self.system
         if sys is None:
             return None
         raw_info = getattr(sys, "info", None)
         info = raw_info if isinstance(raw_info, dict) else {}
-        return {
-            "identifiers": {(DOMAIN, sys.id)},
-            "name": sys.name,
-            "manufacturer": "Beszel",
-            "model": info.get("m"),
-            "sw_version": info.get("v"),
-            "hw_version": info.get("k"),
-        }
+        return DeviceInfo(
+            identifiers={(DOMAIN, sys.id)},
+            name=sys.name,
+            manufacturer="Beszel",
+            model=info.get("m"),
+            sw_version=info.get("v"),
+            hw_version=info.get("k"),
+        )
 
 class BeszelCPUSensor(BeszelBaseSensor):
     @property

@@ -2,6 +2,7 @@ from homeassistant.components.binary_sensor import (
     BinarySensorDeviceClass,
     BinarySensorEntity,
 )
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN, LOGGER, SMART_CURATED_ATTRIBUTES
@@ -135,20 +136,20 @@ class BeszelBaseBinarySensor(CoordinatorEntity, BinarySensorEntity):
         return self.coordinator.last_update_success and self.system is not None
 
     @property
-    def device_info(self):
+    def device_info(self) -> DeviceInfo | None:
         sys = self.system
         if sys is None:
             return None
         raw_info = getattr(sys, "info", None)
         info = raw_info if isinstance(raw_info, dict) else {}
-        return {
-            "identifiers": {(DOMAIN, sys.id)},
-            "name": sys.name,
-            "manufacturer": "Beszel",
-            "model": info.get("m"),
-            "sw_version": info.get("v"),
-            "hw_version": info.get("k"),
-        }
+        return DeviceInfo(
+            identifiers={(DOMAIN, sys.id)},
+            name=sys.name,
+            manufacturer="Beszel",
+            model=info.get("m"),
+            sw_version=info.get("v"),
+            hw_version=info.get("k"),
+        )
 
 
 class BeszelStatusBinarySensor(BeszelBaseBinarySensor):

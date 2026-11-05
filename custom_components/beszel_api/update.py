@@ -2,6 +2,7 @@ from homeassistant.components.update import (
     UpdateEntity,
     UpdateEntityFeature,
 )
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import (
     CoordinatorEntity,
 )
@@ -89,13 +90,13 @@ class BeszelHubUpdate(CoordinatorEntity, UpdateEntity):
         return UpdateEntityFeature(0)
 
     @property
-    def device_info(self):
+    def device_info(self) -> DeviceInfo:
         hub = self.hub_data
-        return {
-            "identifiers": {
+        return DeviceInfo(
+            identifiers={
                 (DOMAIN, self._entry_id),
             },
-            "name": "Beszel Hub",
-            "manufacturer": "Beszel",
-            "sw_version": hub.get("hub_version"),
-        }
+            name="Beszel Hub",
+            manufacturer="Beszel",
+            sw_version=hub.get("hub_version"),
+        )

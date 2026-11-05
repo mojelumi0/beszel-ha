@@ -1,6 +1,7 @@
 {
   "domain": "beszel_api",
   "name": "Beszel API",
+  "categories": ["computers_network.monitoring"],
   "codeowners": ["@mojelumi0"],
   "config_flow": true,
   "dependencies": [],
