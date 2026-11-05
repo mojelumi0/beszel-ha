@@ -5,13 +5,13 @@
 Bring your Beszel systems into Home Assistant with native sensors, diagnostics, update information, and dashboard-ready entities.
 
 [![Latest release](https://img.shields.io/github/v/release/mojelumi0/beszel-ha?style=flat-square)](https://github.com/mojelumi0/beszel-ha/releases/latest)
-[![HACS](https://img.shields.io/badge/HACS-Custom-41BDF5.svg?style=flat-square)](https://my.home-assistant.io/redirect/hacs_repository/?owner=mojelumi0&repository=beszel-ha&category=integration)
+[![Marketplace / HACS](https://img.shields.io/badge/Marketplace%20%2F%20HACS-Custom-41BDF5.svg?style=flat-square)](https://my.home-assistant.io/redirect/hacs_repository/?owner=mojelumi0&repository=beszel-ha&category=integration)
 [![Tests](https://github.com/mojelumi0/beszel-ha/actions/workflows/tests.yml/badge.svg)](https://github.com/mojelumi0/beszel-ha/actions/workflows/tests.yml)
 [![Hassfest](https://github.com/mojelumi0/beszel-ha/actions/workflows/hassfest.yml/badge.svg)](https://github.com/mojelumi0/beszel-ha/actions/workflows/hassfest.yml)
 [![HACS validation](https://github.com/mojelumi0/beszel-ha/actions/workflows/validate.yaml/badge.svg)](https://github.com/mojelumi0/beszel-ha/actions/workflows/validate.yaml)
 [![License](https://img.shields.io/github/license/mojelumi0/beszel-ha?style=flat-square)](LICENSE)
 
-[Install with HACS](https://my.home-assistant.io/redirect/hacs_repository/?owner=mojelumi0&repository=beszel-ha&category=integration) · [Releases](https://github.com/mojelumi0/beszel-ha/releases) · [Report an issue](https://github.com/mojelumi0/beszel-ha/issues)
+[Install in Home Assistant](https://my.home-assistant.io/redirect/hacs_repository/?owner=mojelumi0&repository=beszel-ha&category=integration) · [Releases](https://github.com/mojelumi0/beszel-ha/releases) · [Report an issue](https://github.com/mojelumi0/beszel-ha/issues)
 
 </div>
 
@@ -35,9 +35,31 @@ Beszel already collects useful information about your servers. This integration 
 
 ## Installation
 
-### HACS
+### Home Assistant 2026.11 and newer: Marketplace
 
-1. Select **Install with HACS** above, or open HACS and add this repository as a custom **Integration** repository:
+1. Open **Settings > Marketplace**. Review the first-use notice if prompted. Adding a custom repository requires a GitHub connection; follow the prompts if you have not connected one yet.
+2. Select **Add from link** and enter:
+
+   ```text
+   https://github.com/mojelumi0/beszel-ha
+   ```
+
+3. Open **Beszel API** and select **Install**.
+4. Follow the setup prompt. A first installation can open the integration setup immediately. If Home Assistant requests a restart, restart before continuing.
+5. If setup does not open, go to **Settings > Devices & services > Add integration** and search for **Beszel API**.
+
+Home Assistant migrates existing HACS installations to the Marketplace automatically. If you already installed this fork, check its Marketplace entry before adding it again; you do not need to recreate the Beszel integration. After updating the integration, restart Home Assistant to load the new code. The Marketplace creates a repair when a restart is required.
+
+The **Install in Home Assistant** link above opens the Marketplace on Home Assistant 2026.11 and newer, and HACS on older versions. The repository remains a custom repository; this link does not imply inclusion in the default catalog.
+
+> [!IMPORTANT]
+> This fork and `Ronjar/beszel-ha` share the `beszel_api` domain. The Marketplace cannot install both repositories at the same time. These instructions cover a new installation or an existing installation of this fork. Switching from another fork requires a separate migration plan to preserve devices and entities.
+
+See the [official Marketplace documentation](https://www.home-assistant.io/integrations/marketplace/) for migration details and GitHub connection requirements.
+
+### Older Home Assistant versions: HACS
+
+1. Select **Install in Home Assistant** above, or open HACS and add this repository as a custom **Integration** repository:
 
    ```text
    https://github.com/mojelumi0/beszel-ha
