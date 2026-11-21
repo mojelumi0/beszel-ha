@@ -1001,9 +1001,16 @@ class BeszelWiFiSignalSensor(BeszelBaseSensor):
         if not self.available:
             return {}
         attributes = {"interface": self._interface_name}
-        ssid = self.wifi_data.get("s")
+        wifi_data = self.wifi_data
+        ssid = wifi_data.get("s")
         if isinstance(ssid, str) and ssid:
             attributes["ssid"] = ssid
+        access_point = wifi_data.get("a")
+        if isinstance(access_point, bool):
+            attributes["access_point"] = access_point
+        profile = wifi_data.get("p")
+        if isinstance(profile, str) and profile:
+            attributes["profile"] = profile
         return attributes
 
 

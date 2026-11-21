@@ -192,14 +192,21 @@ RSSI. A system named `homeserver` reporting interface `wlan0` normally creates
 includes `interface` and, when available, `ssid` attributes. Its identity uses
 the OS interface identity, so changing the SSID does not create a new entity.
 
+When reported, `access_point` identifies an access-point interface and `profile`
+contains the Windows connection profile name. These optional fields are present
+in Beszel's development branch and may be absent in stable releases. For an
+OpenWrt access point (`access_point: true`), the signal is the average RSSI of
+associated clients, rather than the host's own connection to another access
+point. A profile or access-point change does not change the entity's identity.
+
 Only current readings in `system.info.wf` create Wi-Fi entities. An interface
 without a numeric, finite signal reading creates no entity; signal quality
 percentages are never converted to dBm. Interfaces appearing later are
 discovered automatically on a subsequent coordinator update.
 
 If an interface disconnects or stops reporting a signal, its existing entity
-remains registered and becomes **unavailable**. Its current value and SSID
-attributes are cleared until a new reading arrives. Historical `stats.wf`
+remains registered and becomes **unavailable**. Its current value and all
+Wi-Fi attributes are cleared until a new reading arrives. Historical `stats.wf`
 values never substitute for a missing current reading. A Hub or Agent outage
 also makes the signal unavailable. Existing entities recover automatically
 when current readings return, preserving dashboards and history.
