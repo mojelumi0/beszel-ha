@@ -241,6 +241,94 @@ def test_wifi_signal_uses_native_dbm_and_current_ssid():
     assert sensor.native_value == -60
 
 
+def test_wifi_reports_access_point_signal_and_clears_metadata_on_role_change():
+    """AP RSSI is a client average, while identity remains the OS interface."""
+    system = _system({"wf": {"wlan0": {"s": "Guest", "r": -62, "a": True}}})
+    sensor = BeszelWiFiSignalSensor(_coordinator(system), system, "wlan0")
+    unique_id = sensor.unique_id
+    assert sensor.native_value == -62
+    assert sensor.extra_state_attributes == {
+        "interface": "wlan0",
+        "ssid": "Guest",
+        "access_point": True,
+    }
+
+    system.info["wf"]["wlan0"] = {"s": "Uplink", "r": -75}
+    assert sensor.unique_id == unique_id
+    assert sensor.native_value == -75
+    assert sensor.extra_state_attributes == {"interface": "wlan0", "ssid": "Uplink"}
+
+
+def test_wifi_profile_changes_preserve_identity_and_do_not_reuse_old_metadata():
+    """The Windows profile is optional metadata, independent of SSID and ID."""
+    system = _system({"wf": {"Wi-Fi": {"s": "Home", "p": "Home 2", "r": -55}}})
+    sensor = BeszelWiFiSignalSensor(_coordinator(system), system, "Wi-Fi")
+    unique_id = sensor.unique_id
+    assert sensor.extra_state_attributes == {
+        "interface": "Wi-Fi",
+        "ssid": "Home",
+        "profile": "Home 2",
+    }
+
+    system.info["wf"]["Wi-Fi"] = {"s": "Home", "p": "Private", "r": -50}
+    assert sensor.extra_state_attributes["profile"] == "Private"
+    assert sensor.unique_id == unique_id
+    system.info["wf"]["Wi-Fi"] = {"r": -48}
+    assert sensor.available is True
+    assert sensor.native_value == -48
+    assert sensor.extra_state_attributes == {"interface": "Wi-Fi"}
+
+
+@pytest.mark.parametrize(
+    ("metadata", "expected"),
+    [
+        ({"a": "true", "p": 42}, {}),
+        ({"a": 1, "p": []}, {}),
+        ({"a": None, "p": ""}, {}),
+        ({"a": False, "p": "Private"}, {"access_point": False, "profile": "Private"}),
+    ],
+)
+def test_wifi_optional_metadata_does_not_coerce_invalid_values(metadata, expected):
+    """Malformed metadata must neither break RSSI nor invent an AP or profile."""
+    system = _system({"wf": {"wlan0": {"r": -60, **metadata}}})
+    sensor = BeszelWiFiSignalSensor(_coordinator(system), system, "wlan0")
+    assert sensor.available is True
+    assert sensor.native_value == -60
+    assert sensor.extra_state_attributes == {"interface": "wlan0", **expected}
+
+
+async def test_wifi_access_point_is_discovered_only_with_client_signal_and_recovers():
+    """An AP without client RSSI creates no entity, and later outages retain it."""
+    system = _system({"wf": {"ap0": {"s": "Guest", "a": True}}})
+    coordinator, _, add_entities = await _setup(system)
+    assert not any(
+        isinstance(entity, BeszelWiFiSignalSensor)
+        for entity in add_entities.call_args.args[0]
+    )
+    add_entities.reset_mock()
+    discover = coordinator.async_add_listener.call_args.args[0]
+    system.info["wf"]["ap0"]["r"] = -62
+    discover()
+    [sensor] = add_entities.call_args.args[0]
+    unique_id = sensor.unique_id
+    assert unique_id == "beszel_system-1_wifi_signal_ap0"
+    assert sensor.extra_state_attributes["access_point"] is True
+    assert sensor.native_value == -62
+
+    system.info["wf"]["ap0"].pop("r")
+    discover()
+    assert sensor.available is False
+    assert sensor.native_value is None
+    assert sensor.extra_state_attributes == {}
+    system.info["wf"]["ap0"] = {"s": "New guest", "a": True, "r": -68}
+    discover()
+    assert sensor.available is True
+    assert sensor.native_value == -68
+    assert sensor.extra_state_attributes["ssid"] == "New guest"
+    assert sensor.unique_id == unique_id
+    assert add_entities.call_count == 1
+
+
 @pytest.mark.parametrize(
     "wifi",
     [
@@ -256,6 +344,9 @@ def test_wifi_signal_uses_native_dbm_and_current_ssid():
         {"wlan0": {"r": "-55"}},
         {"wlan0": {"r": float("nan")}},
         {"wlan0": {"r": float("inf")}},
+        {"wlan0": {"s": "Guest", "a": True}},
+        {"wlan0": {"p": "Private", "r": None}},
+        {"wlan0": {"a": True, "p": "Private", "r": float("nan")}},
         {"": {"r": -55}},
         {42: {"r": -55}},
     ],
@@ -337,7 +428,9 @@ async def test_wifi_discovery_retains_interfaces_and_recovers_without_duplicates
 
 @pytest.mark.parametrize("outage", ["hub", "agent", "system", "signal", "wifi"])
 def test_wifi_hides_stale_values_and_metadata_during_outages(outage):
-    system = _system({"wf": {"wlan0": {"s": "Home", "r": -55}}})
+    system = _system(
+        {"wf": {"wlan0": {"s": "Home", "r": -55, "a": True, "p": "Private"}}}
+    )
     coordinator = _coordinator(system, {"wf": {"wlan0": -55}})
     sensor = BeszelWiFiSignalSensor(coordinator, system, "wlan0")
     if outage == "hub":

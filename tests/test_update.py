@@ -7,6 +7,12 @@ from custom_components.beszel_api.update import (
 )
 
 
+def _device_fields(entity):
+    """Read fields without deprecated DeviceInfo mapping access."""
+    info = entity.device_info
+    return info.as_dict() if hasattr(info, "as_dict") else info
+
+
 def test_missing_hub_data_is_safe():
     coordinator = MagicMock()
     coordinator.data = None
@@ -20,7 +26,7 @@ def test_missing_hub_data_is_safe():
     assert entity.installed_version is None
     assert entity.latest_version is None
     assert entity.release_url is None
-    assert entity.device_info["sw_version"] is None
+    assert _device_fields(entity)["sw_version"] is None
 
 
 def test_hub_update_data_is_exposed():
@@ -46,6 +52,6 @@ def test_hub_update_data_is_exposed():
         == "https://example.test/release"
     )
     assert (
-        entity.device_info["sw_version"]
+        _device_fields(entity)["sw_version"]
         == "0.18.8"
     )
