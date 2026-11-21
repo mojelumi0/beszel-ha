@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import pytest
 from homeassistant import config_entries, data_entry_flow
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from pytest_homeassistant.common import MockConfigEntry
 
 from custom_components.beszel_api.api import BeszelInvalidAuth
 from custom_components.beszel_api.config_flow import InvalidUrl, _validate_url
