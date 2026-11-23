@@ -2,29 +2,89 @@
 
 [![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Ronjar&repository=beszel-ha&category=integration)
 
-1. Install the Beszel API addon via HACS from the link above or by searching for it inside of HACS
-2. Restart HomeAssistant
-3. Go to integrations, press Add integration and search for BeszelAPI
-4. In the Setup Dialog use the following values
-    - *URL*: The root url / IP of your Beszel instance, like http://beszel.example.com or https://beszel.example.com
-    - *user*: Either your default admin username / email or (recommended) create another user with the role user and assigning the agents you want to expose to it.
-    - *password*: The password to the user
-5. The API will pull the data and reload every 2 minutes
+1. Install the **Beszel API** integration through **Marketplace** using the link above, or search for it under **Settings > Marketplace**.
+2. Restart Home Assistant if requested after installation or an update.
+3. Go to **Settings > Devices & services > Add integration** and search for **Beszel API**.
+4. Enter your Beszel Hub connection details:
+    - **URL**: The root URL or IP address, including `http://` or `https://` and the port when needed. Examples: `https://beszel.example.com` or `http://192.168.1.123:8090`. Use your Hub's actual address and port.
+    - **Username**: Your Beszel username/email. A dedicated user assigned only to the desired systems is recommended.
+    - **Password**: The password for that user.
+5. Choose the monitored systems as described below.
 
-Currently all machines are added, selection will be added later (you can change this yourself by creating a new user in Beszel's PocketBase and adding this user only to the machines you want to be monitored).
+The default monitoring interval is 120 seconds and can be changed in the integration options.
+On older Home Assistant versions without Marketplace, install through HACS and restart Home Assistant.
+
+### Choosing monitored systems
+
+After validating the connection, choose **All systems** (the default) or
+**Selected systems** and select one or more systems from the list. System names
+and stable IDs distinguish machines with the same name; offline systems can be
+selected too. All systems automatically includes systems added later. Selected
+systems only monitors the saved IDs, even when a system is renamed.
+
+To change the selection, open **Settings > Devices & services > Beszel API >
+Configure**, submit the connection settings, then update the system selection.
+Existing installations without selection settings continue to monitor all
+systems. Changes take effect after the integration reloads. Deselecting a system
+does not delete its entity registry entries; these remain unavailable and reuse
+their existing IDs when selected again. Previously selected systems remain in
+the selection list by ID while absent from the Hub response.
+
+The selection controls Home Assistant monitoring. To restrict the account's
+access itself, assign only the desired systems to that user in Beszel.
 
 # Usage
-After installing the following entities will exposed as sensors (more to come):
-- Status (Connection)
-- Uptime (Minutes)
-- CPU (Percentage)
-- Disk usage (Percentage)
-- Temperature (°C)
-- Bandwidth (Mbit/s)
-- RAM (Percentage)
-- Battery (Percentage)
 
-For example if your machine is named *test*, CPU will be available as ```sensor.test_cpu```
+Each Beszel system becomes a Home Assistant device. Entity IDs are based on the system name in Beszel. A system called `homeserver`, for example, normally creates `sensor.homeserver_cpu`, `sensor.homeserver_ram`, and `binary_sensor.homeserver_status`.
+
+### Main sensors
+
+| Entity | Unit | Details |
+|---|---:|---|
+| CPU | `%` | Per-core usage and user/system/iowait/steal/idle/IRQ/SoftIRQ/Nice breakdown are attributes |
+| RAM | `%` | Used, total, buffer/cache, and ZFS ARC values are attributes |
+| RAM Total | `GiB` | Total installed memory |
+| Disk | `%` | Used and total space are attributes |
+| Disk Total | `GiB` | Total size of the primary disk |
+| Bandwidth | `MiB/s` | Combined current network rate |
+| Network Receive | `KiB/s` | Current received data rate |
+| Network Send | `KiB/s` | Current sent data rate |
+| Uptime | `min` | System uptime |
+| Status | on/off | Connectivity binary sensor for the Beszel Agent |
+
+### Automatically discovered sensors
+
+These entities appear only when the Beszel Hub or Agent reports the corresponding data.
+
+| Entity | Unit | Details |
+|---|---:|---|
+| GPU | `%` | One per GPU, with VRAM, power, package power, and engine usage attributes |
+| SWAP | `%` | Includes used and total swap attributes |
+| Temperature | `°C` | Main temperature with named temperature zones as attributes |
+| Additional disks | `%` / `GiB` | Usage, total size, and supported I/O details for additional mounted filesystems |
+| ZFS pool | `%` | One diagnostic usage sensor plus a problem binary sensor per pool, with health, capacity, and I/O attributes |
+| S.M.A.R.T. | problem/ok | Disk health, temperature, capacity, lifetime, and selected failure attributes |
+| Load Average 1m / 5m / 15m | - | Diagnostic sensors, disabled by default |
+| Failed Services | - | Number of failed systemd services |
+| Total Services | - | Diagnostic sensor, disabled by default |
+| Fan | `rpm` | One diagnostic sensor per fan reported by recent Linux Agents |
+| Wi-Fi Signal | `dBm` | One diagnostic sensor per interface with a current native signal reading; SSID is an attribute when reported |
+| Battery | `%` | Existing primary battery plus additional named batteries |
+| Beszel Hub Update | - | Available when Hub update checks are enabled |
+
+Some diagnostics are disabled by default to keep the entity list and Home Assistant Recorder database manageable. You can enable them from the Beszel device page in **Settings > Devices & services > Entities**.
+
+Fan monitoring, multiple named batteries, and the newest I/O and GPU details
+require a recent Beszel Hub and Agent. ZFS pool metrics require Beszel 0.19 or
+newer. Older Agents continue to work with the metrics they support.
+
+The main disk entity also exposes supported read/write rates, cumulative I/O,
+latency, and utilization values as attributes. Network receive and send
+entities expose a compact `interfaces` attribute with per-interface rates and
+cumulative traffic, so these details do not create dozens of extra entities.
+
+
+For a system named `test`, the CPU entity normally has the ID `sensor.test_cpu`.
 
 ## Additional diagnostics and compatibility
 
@@ -68,10 +128,10 @@ python -m ruff check custom_components/beszel_api tests
 
 # Examples
 Here is one of my machines with the entities the integration currently exports
-![Screenshot from HomeAssistant settings page of my device and its entities](/pictures/sensors.png)
+![Screenshot from the Home Assistant device page and its entities](/pictures/sensors.png)
 
 And here one card I created for myself using those sensors:
-![Screenshot from HomeAssistant dashboard with a card showing CPU, RAM and Disk usage as bar charts](/pictures/example_card.png)
+![Screenshot from a Home Assistant dashboard showing CPU, RAM and disk usage](/pictures/example_card.png)
 
 The YAML for this card layout:
 ``` YAML

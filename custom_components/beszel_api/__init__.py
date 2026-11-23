@@ -20,15 +20,31 @@ from .api import (
 )
 from .const import (
     CONF_PASSWORD,
+    CONF_SYSTEM_IDS,
+    CONF_SYSTEM_SELECTION,
     CONF_UPDATE_INTERVAL,
     CONF_URL,
     CONF_USERNAME,
     CONF_VERIFY_SSL,
     DOMAIN,
     LOGGER,
+    SYSTEM_SELECTION_ALL,
+    SYSTEM_SELECTION_SELECTED,
 )
 
 PLATFORMS = [Platform.SENSOR, Platform.BINARY_SENSOR, Platform.UPDATE]
+
+
+def _filter_systems(systems: list[Any], data: dict[str, Any]) -> list[Any]:
+    """Legacy entries monitor all systems; explicit selections use stable IDs."""
+    mode = data.get(CONF_SYSTEM_SELECTION, SYSTEM_SELECTION_ALL)
+    if mode == SYSTEM_SELECTION_ALL:
+        return systems
+    selected = data.get(CONF_SYSTEM_IDS, [])
+    if mode != SYSTEM_SELECTION_SELECTED or not isinstance(selected, list):
+        return []
+    selected_ids = {value for value in selected if isinstance(value, str)}
+    return [system for system in systems if getattr(system, "id", None) in selected_ids]
 
 
 def _system_is_online(system: Any) -> bool:
@@ -115,7 +131,9 @@ async def async_setup_entry(hass, entry: ConfigEntry) -> bool:
     async def async_update_data() -> dict[str, Any]:
         """Fetch systems, current statistics, and S.M.A.R.T. data."""
         try:
-            systems = await hass.async_add_executor_job(client.get_systems)
+            systems = _filter_systems(
+                await hass.async_add_executor_job(client.get_systems), entry.data
+            )
 
             # A valid restricted account may currently have no assigned
             # systems. Treat that as an empty result, not an auth failure.
@@ -132,9 +150,10 @@ async def async_setup_entry(hass, entry: ConfigEntry) -> bool:
             stats_data, all_smart = await asyncio.gather(stats_task, smart_task)
 
             smart_devices: dict[str, list[dict[str, Any]]] = {}
+            monitored_ids = {system.id for system in systems}
             for device in all_smart:
                 system_id = getattr(device, "system", None)
-                if not system_id:
+                if system_id not in monitored_ids:
                     continue
                 smart_devices.setdefault(system_id, []).append(
                     {

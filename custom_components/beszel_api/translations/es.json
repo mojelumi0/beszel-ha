@@ -9,7 +9,9 @@
       "invalid_auth": "Nombre de usuario o contraseña no válidos.",
       "invalid_url": "La URL debe comenzar con http:// o https://.",
       "invalid_update_interval": "El intervalo de actualización debe estar entre 10 y 3600 segundos.",
-      "unknown": "Se produjo un error inesperado."
+      "unknown": "Se produjo un error inesperado.",
+      "no_systems_selected": "Selecciona al menos un sistema o elige Todos los sistemas.",
+      "invalid_system_selection": "Elige un modo válido y sistemas de la lista."
     },
     "step": {
       "user": {
@@ -30,6 +32,17 @@
           "username": "Usuario",
           "password": "Contraseña"
         }
+      },
+      "systems": {
+        "title": "Elegir los sistemas supervisados",
+        "description": "Supervisa todos los sistemas visibles para este usuario de Beszel o elige sistemas concretos. Todos los sistemas también incluye los añadidos más adelante.",
+        "data": {
+          "system_selection": "Modo de supervisión",
+          "system_ids": "Sistemas seleccionados"
+        },
+        "data_description": {
+          "system_ids": "Solo se utiliza en el modo Sistemas seleccionados. Las selecciones anteriores conservan su ID si el sistema no está disponible temporalmente."
+        }
       }
     }
   },
@@ -39,7 +52,9 @@
       "invalid_auth": "Nombre de usuario o contraseña no válidos.",
       "invalid_url": "La URL debe comenzar con http:// o https://.",
       "invalid_update_interval": "El intervalo de actualización debe estar entre 10 y 3600 segundos.",
-      "unknown": "Se produjo un error inesperado."
+      "unknown": "Se produjo un error inesperado.",
+      "no_systems_selected": "Selecciona al menos un sistema o elige Todos los sistemas.",
+      "invalid_system_selection": "Elige un modo válido y sistemas de la lista."
     },
     "step": {
       "init": {
@@ -52,6 +67,25 @@
           "update_interval": "Intervalo de actualización de la API en segundos",
           "verify_ssl": "Verificar el certificado SSL de la API de Beszel"
         }
+      },
+      "systems": {
+        "title": "Elegir los sistemas supervisados",
+        "description": "Supervisa todos los sistemas visibles para este usuario de Beszel o elige sistemas concretos. Todos los sistemas también incluye los añadidos más adelante.",
+        "data": {
+          "system_selection": "Modo de supervisión",
+          "system_ids": "Sistemas seleccionados"
+        },
+        "data_description": {
+          "system_ids": "Solo se utiliza en el modo Sistemas seleccionados. Las selecciones anteriores conservan su ID si el sistema no está disponible temporalmente."
+        }
+      }
+    }
+  },
+  "selector": {
+    "system_selection": {
+      "options": {
+        "all": "Todos los sistemas",
+        "selected": "Sistemas seleccionados"
       }
     }
   }

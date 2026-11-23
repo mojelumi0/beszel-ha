@@ -9,7 +9,9 @@
       "invalid_auth": "Ungültiger Benutzername oder Passwort.",
       "invalid_url": "Die URL muss mit http:// oder https:// beginnen.",
       "invalid_update_interval": "Das Updateintervall muss zwischen 10 und 3600 Sekunden liegen.",
-      "unknown": "Unerwarteter Fehler aufgetreten."
+      "unknown": "Unerwarteter Fehler aufgetreten.",
+      "no_systems_selected": "Wähle mindestens ein System oder den Modus Alle Systeme aus.",
+      "invalid_system_selection": "Wähle einen gültigen Überwachungsmodus und Systeme aus der Liste aus."
     },
     "step": {
       "user": {
@@ -30,6 +32,17 @@
           "username": "Benutzername",
           "password": "Passwort"
         }
+      },
+      "systems": {
+        "title": "Überwachte Systeme auswählen",
+        "description": "Überwache alle für diesen Beszel-Benutzer sichtbaren Systeme oder wähle einzelne Systeme aus. Alle Systeme umfasst auch später hinzugefügte Systeme.",
+        "data": {
+          "system_selection": "Überwachungsmodus",
+          "system_ids": "Ausgewählte Systeme"
+        },
+        "data_description": {
+          "system_ids": "Wird nur im Modus Ausgewählte Systeme verwendet. Frühere Auswahlen bleiben bei vorübergehend fehlenden Systemen unter ihrer ID erhalten."
+        }
       }
     }
   },
@@ -39,7 +52,9 @@
       "invalid_auth": "Ungültiger Benutzername oder Passwort.",
       "invalid_url": "Die URL muss mit http:// oder https:// beginnen.",
       "invalid_update_interval": "Das Updateintervall muss zwischen 10 und 3600 Sekunden liegen.",
-      "unknown": "Unerwarteter Fehler aufgetreten."
+      "unknown": "Unerwarteter Fehler aufgetreten.",
+      "no_systems_selected": "Wähle mindestens ein System oder den Modus Alle Systeme aus.",
+      "invalid_system_selection": "Wähle einen gültigen Überwachungsmodus und Systeme aus der Liste aus."
     },
     "step": {
       "init": {
@@ -52,6 +67,25 @@
           "update_interval": "API Updateintervall in Sekunden",
           "verify_ssl": "Beszel API SSL Zertifikat überprüfen"
         }
+      },
+      "systems": {
+        "title": "Überwachte Systeme auswählen",
+        "description": "Überwache alle für diesen Beszel-Benutzer sichtbaren Systeme oder wähle einzelne Systeme aus. Alle Systeme umfasst auch später hinzugefügte Systeme.",
+        "data": {
+          "system_selection": "Überwachungsmodus",
+          "system_ids": "Ausgewählte Systeme"
+        },
+        "data_description": {
+          "system_ids": "Wird nur im Modus Ausgewählte Systeme verwendet. Frühere Auswahlen bleiben bei vorübergehend fehlenden Systemen unter ihrer ID erhalten."
+        }
+      }
+    }
+  },
+  "selector": {
+    "system_selection": {
+      "options": {
+        "all": "Alle Systeme",
+        "selected": "Ausgewählte Systeme"
       }
     }
   }
