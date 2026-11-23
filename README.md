@@ -26,6 +26,46 @@ After installing the following entities will exposed as sensors (more to come):
 
 For example if your machine is named *test*, CPU will be available as ```sensor.test_cpu```
 
+## Additional diagnostics and compatibility
+
+Additional metrics are exposed when reported by the Beszel Hub and Agent:
+CPU load averages, per-core CPU attributes, disk I/O, per-interface network
+attributes, fan speeds, named batteries, systemd service counts, ZFS pools and
+health, and per-interface Wi-Fi signal sensors. GPU and S.M.A.R.T. entities expose
+additional diagnostic attributes. Later-reported metrics are discovered on
+subsequent updates without reloading the integration.
+
+Beszel 0.21.1 RAM and Swap byte fields are preferred, with legacy fields retained
+as fallbacks. Swap total and used values are validated as a complete pair.
+Existing sensor unique IDs and legacy attributes are preserved. During a Hub or
+Agent outage, measurements become unavailable instead of displaying stale values.
+
+Wi-Fi sensors require a current, finite native RSSI reading in dBm. No entity is
+created for an interface without a signal reading. Existing entities remain
+registered during outages and recover without duplicates. The interface is the
+identity; SSID changes do not create a new sensor. Optional `access_point` and
+Windows `profile` attributes are shown only when reported. For an OpenWrt access
+point, the signal is the average RSSI of its associated clients. Optional Wi-Fi
+metadata depends on the Hub and Agent version. Signal and metadata are cleared
+when a current reading is unavailable.
+
+Setup and options validate connectivity, credentials, the HTTP(S) URL, and an
+update interval from 10 to 3600 seconds. Username and password are required;
+use a dedicated Beszel user assigned to the systems you want to monitor.
+Expired sessions are refreshed automatically, and rejected credentials trigger
+Home Assistant's reauthentication flow for the existing config entry.
+
+## Development tests
+
+The tests target Home Assistant 2026.11.2 and require Python 3.14.2 or newer
+within the 3.14 series. Run the complete Home Assistant fixture suite on Linux:
+
+```shell
+python -m pip install -r requirements_test.txt
+python -m pytest -v
+python -m ruff check custom_components/beszel_api tests
+```
+
 # Examples
 Here is one of my machines with the entities the integration currently exports
 ![Screenshot from HomeAssistant settings page of my device and its entities](/pictures/sensors.png)

@@ -1,47 +1,58 @@
 {
   "config": {
+    "abort": {
+      "already_configured": "This Beszel Hub is already configured.",
+      "reauth_successful": "Reauthentication was successful."
+    },
+    "error": {
+      "cannot_connect": "Failed to connect to the Beszel instance.",
+      "invalid_auth": "Invalid username or password.",
+      "invalid_url": "URL must start with http:// or https://.",
+      "invalid_update_interval": "Update interval must be between 10 and 3600 seconds.",
+      "unknown": "Unexpected error occurred."
+    },
     "step": {
       "user": {
         "title": "Add Beszel API configuration",
         "description": "Enter your Beszel API connection details",
         "data": {
           "url": "URL",
-          "username": "Username (optional)",
-          "password": "Password (optional)",
+          "username": "Username",
+          "password": "Password",
           "update_interval": "API update interval in seconds",
           "verify_ssl": "Verify Beszel API SSL certificate"
         }
       },
       "reauth_confirm": {
-        "title": "Re-authenticate with Beszel Hub",
-        "description": "Enter your updated credentials for the Beszel Hub",
+        "title": "Reauthenticate Beszel API",
+        "description": "Your Beszel credentials are no longer valid. Enter valid credentials to reconnect.",
         "data": {
-          "username": "Username (optional)",
+          "username": "Username",
           "password": "Password"
         }
       }
-    },
-    "error": {
-      "invalid_auth": "Invalid username or password",
-      "cannot_connect": "Failed to connect to Beszel Hub"
-    },
-    "abort": {
-      "reauth_successful": "Re-authentication was successful"
     }
   },
   "options": {
+    "error": {
+      "cannot_connect": "Failed to connect to the Beszel instance.",
+      "invalid_auth": "Invalid username or password.",
+      "invalid_url": "URL must start with http:// or https://.",
+      "invalid_update_interval": "Update interval must be between 10 and 3600 seconds.",
+      "unknown": "Unexpected error occurred."
+    },
     "step": {
       "init": {
-          "title": "Update Beszel API configuration",
-          "description": "Change your Beszel API connection details",
-          "data": {
-            "url": "URL",
-            "username": "Username (optional)",
-            "password": "Password (optional)",
+        "title": "Update Beszel API configuration",
+        "description": "Change your Beszel API connection details",
+        "data": {
+          "url": "URL",
+          "username": "Username",
+          "password": "Password",
           "update_interval": "API update interval in seconds",
-            "verify_ssl": "Verify Beszel API SSL certificate"
-          }
+          "verify_ssl": "Verify Beszel API SSL certificate"
         }
+      }
     }
   }
 }

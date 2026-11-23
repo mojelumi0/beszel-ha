@@ -1,0 +1,4 @@
+# Matches Home Assistant 2026.11.2; requires Python 3.14.2 or newer.
+pytest-homeassistant==2026.11.2
+pocketbase==0.17.3
+ruff==0.17.5

@@ -1,25 +1,65 @@
-from homeassistant.components.update import UpdateEntity, UpdateEntityFeature
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.components.update import (
+    UpdateEntity,
+    UpdateEntityFeature,
+)
+from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.update_coordinator import (
+    CoordinatorEntity,
+)
+
 from .const import DOMAIN, LOGGER
 
-async def async_setup_entry(hass, entry, async_add_entities):
+
+async def async_setup_entry(
+    hass,
+    entry,
+    async_add_entities,
+):
     data = hass.data[DOMAIN][entry.entry_id]
     hub_coordinator = data["hub"]
-    
+
     if hub_coordinator is None:
-        LOGGER.debug("Update check is disabled, skipping Beszel Hub Update entity")
+        LOGGER.debug(
+            "Update check is disabled, skipping "
+            "Beszel Hub Update entity"
+        )
         return
-    
-    if not hub_coordinator.data.get("check_update", False):
+
+    hub_data = hub_coordinator.data or {}
+    if not hub_data.get("check_update", False):
         return
-    
-    async_add_entities([BeszelHubUpdate(hub_coordinator, entry.entry_id, entry.data.get("url"))])
+
+    async_add_entities(
+        [
+            BeszelHubUpdate(
+                hub_coordinator,
+                entry.entry_id,
+                entry.data.get("url"),
+            )
+        ]
+    )
+
 
 class BeszelHubUpdate(CoordinatorEntity, UpdateEntity):
-    def __init__(self, coordinator, entry_id: str, base_url: str):
+    def __init__(
+        self,
+        coordinator,
+        entry_id: str,
+        base_url: str,
+    ):
         super().__init__(coordinator)
         self._entry_id = entry_id
-        self._base_url = base_url.rstrip("/") if base_url else base_url
+        self._base_url = (
+            base_url.rstrip("/")
+            if base_url
+            else base_url
+        )
+
+    @property
+    def hub_data(self):
+        """Return Hub data safely after partial refreshes."""
+        data = self.coordinator.data
+        return data if isinstance(data, dict) else {}
 
     @property
     def unique_id(self):
@@ -31,15 +71,15 @@ class BeszelHubUpdate(CoordinatorEntity, UpdateEntity):
 
     @property
     def installed_version(self):
-        return self.coordinator.data.get("hub_version")
+        return self.hub_data.get("hub_version")
 
     @property
     def latest_version(self):
-        return self.coordinator.data.get("latest_version")
+        return self.hub_data.get("latest_version")
 
     @property
     def release_url(self):
-        return self.coordinator.data.get("latest_release_url")
+        return self.hub_data.get("latest_release_url")
 
     @property
     def in_progress(self) -> bool:
@@ -50,11 +90,13 @@ class BeszelHubUpdate(CoordinatorEntity, UpdateEntity):
         return UpdateEntityFeature(0)
 
     @property
-    def device_info(self):
-        hub = self.coordinator.data
-        return {
-            "identifiers": {(DOMAIN, self._entry_id)},
-            "name": "Beszel Hub",
-            "manufacturer": "Beszel",
-            "sw_version": hub.get("hub_version"),
-        }
+    def device_info(self) -> DeviceInfo:
+        hub = self.hub_data
+        return DeviceInfo(
+            identifiers={
+                (DOMAIN, self._entry_id),
+            },
+            name="Beszel Hub",
+            manufacturer="Beszel",
+            sw_version=hub.get("hub_version"),
+        )
