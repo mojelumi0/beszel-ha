@@ -113,7 +113,26 @@ The setup form asks for:
 | Verify SSL | Verify the HTTPS certificate; leave enabled for trusted certificates |
 
 > [!TIP]
-> Create a dedicated Beszel user for Home Assistant and give it access only to the systems you want to expose. The integration automatically adds every system visible to that account.
+> Create a dedicated Beszel user for Home Assistant and give it access only to the desired systems. By default, the integration monitors every system visible to that account. Choose Selected systems during setup or in the integration options to monitor a specific subset.
+
+### Choosing monitored systems
+
+After validating the connection, choose **All systems** (the default) or
+**Selected systems** and select one or more systems from the list. System names
+and stable IDs distinguish machines with the same name; offline systems can be
+selected too. All systems automatically includes systems added later. Selected
+systems only monitors the saved IDs, even when a system is renamed.
+
+To change the selection, open **Settings > Devices & services > Beszel API >
+Configure**, submit the connection settings, then update the system selection.
+Existing installations without selection settings continue to monitor all
+systems. Changes take effect after the integration reloads. Deselecting a system
+does not delete its entity registry entries; these remain unavailable and reuse
+their existing IDs when selected again. Previously selected systems remain in
+the selection list by ID while absent from the Hub response.
+
+The selection controls Home Assistant monitoring. To restrict the account's
+access itself, assign only the desired systems to that user in Beszel.
 
 ## Available entities
 

@@ -9,7 +9,9 @@
       "invalid_auth": "Invalid username or password.",
       "invalid_url": "URL must start with http:// or https://.",
       "invalid_update_interval": "Update interval must be between 10 and 3600 seconds.",
-      "unknown": "Unexpected error occurred."
+      "unknown": "Unexpected error occurred.",
+      "no_systems_selected": "Select at least one system, or choose All systems.",
+      "invalid_system_selection": "Choose a valid monitoring mode and systems from the list."
     },
     "step": {
       "user": {
@@ -30,6 +32,17 @@
           "username": "Username",
           "password": "Password"
         }
+      },
+      "systems": {
+        "title": "Choose monitored systems",
+        "description": "Monitor all systems visible to this Beszel user, or select specific systems. All systems also includes systems added later.",
+        "data": {
+          "system_selection": "Monitoring mode",
+          "system_ids": "Selected systems"
+        },
+        "data_description": {
+          "system_ids": "Used only in Selected systems mode. Previously selected systems stay listed by ID if they are currently unavailable."
+        }
       }
     }
   },
@@ -39,7 +52,9 @@
       "invalid_auth": "Invalid username or password.",
       "invalid_url": "URL must start with http:// or https://.",
       "invalid_update_interval": "Update interval must be between 10 and 3600 seconds.",
-      "unknown": "Unexpected error occurred."
+      "unknown": "Unexpected error occurred.",
+      "no_systems_selected": "Select at least one system, or choose All systems.",
+      "invalid_system_selection": "Choose a valid monitoring mode and systems from the list."
     },
     "step": {
       "init": {
@@ -52,6 +67,25 @@
           "update_interval": "API update interval in seconds",
           "verify_ssl": "Verify Beszel API SSL certificate"
         }
+      },
+      "systems": {
+        "title": "Choose monitored systems",
+        "description": "Monitor all systems visible to this Beszel user, or select specific systems. All systems also includes systems added later.",
+        "data": {
+          "system_selection": "Monitoring mode",
+          "system_ids": "Selected systems"
+        },
+        "data_description": {
+          "system_ids": "Used only in Selected systems mode. Previously selected systems stay listed by ID if they are currently unavailable."
+        }
+      }
+    }
+  },
+  "selector": {
+    "system_selection": {
+      "options": {
+        "all": "All systems",
+        "selected": "Selected systems"
       }
     }
   }

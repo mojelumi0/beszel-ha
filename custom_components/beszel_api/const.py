@@ -6,6 +6,10 @@ CONF_USERNAME = "username"
 CONF_PASSWORD = "password"
 CONF_VERIFY_SSL = "verify_ssl"
 CONF_UPDATE_INTERVAL = "update_interval"
+CONF_SYSTEM_SELECTION = "system_selection"
+CONF_SYSTEM_IDS = "system_ids"
+SYSTEM_SELECTION_ALL = "all"
+SYSTEM_SELECTION_SELECTED = "selected"
 LOGGER = logging.getLogger(__package__)
 
 # Curated S.M.A.R.T. attributes exposed as extra sensor attributes on the
